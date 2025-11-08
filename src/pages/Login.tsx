@@ -25,7 +25,7 @@ const Login = () => {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center mb-4">
-            <img src={pigmintLogo} alt="PigMint Finance Logo" className="w-16 h-16" />
+            <img src={pigmintLogo} alt="PigMint Finance Logo" className="w-24 h-24" />
           </div>
           <h1 className="text-3xl font-bold mb-2">PigMint Finance</h1>
           <p className="text-muted-foreground">Your daily savings, one mint at a time.</p>
