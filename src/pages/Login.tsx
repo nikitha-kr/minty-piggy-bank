@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Coins } from "lucide-react";
+import pigmintLogo from "@/assets/pigmint-logo.png";
 import { toast } from "sonner";
 
 const Login = () => {
@@ -24,8 +24,8 @@ const Login = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-primary rounded-full mb-4">
-            <Coins className="w-8 h-8 text-primary-foreground" />
+          <div className="inline-flex items-center justify-center mb-4">
+            <img src={pigmintLogo} alt="PigMint Finance Logo" className="w-16 h-16" />
           </div>
           <h1 className="text-3xl font-bold mb-2">PigMint Finance</h1>
           <p className="text-muted-foreground">Your daily savings, one mint at a time.</p>
