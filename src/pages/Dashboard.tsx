@@ -1,11 +1,21 @@
 import { useState } from "react";
 import { Header } from "@/components/Header";
 import { RecommendationCard } from "@/components/RecommendationCard";
+import { GoalCard } from "@/components/GoalCard";
 import { TransactionList } from "@/components/TransactionList";
-import { Coins, Coffee, ShoppingBag, Utensils } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Coins, Coffee, ShoppingBag, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 
 const Dashboard = () => {
+  const navigate = useNavigate();
+  
+  const [goals] = useState([
+    { id: "1", name: "Emergency Fund", current: 150, target: 500 },
+    { id: "2", name: "Vacation", current: 75, target: 1000 },
+  ]);
+
   const [recommendations] = useState([
     {
       id: "1",
@@ -68,8 +78,9 @@ const Dashboard = () => {
     },
   ]);
 
-  const handleSave = (amount: string) => {
-    toast.success(`Great! You saved ${amount}`);
+  const handleSave = (amount: string, goalId: string) => {
+    const goal = goals.find(g => g.id === goalId);
+    toast.success(`Great! You saved ${amount} to ${goal?.name || "your goal"}`);
   };
 
   const handleDismiss = () => {
@@ -81,20 +92,43 @@ const Dashboard = () => {
       <Header />
       <main className="container mx-auto px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div>
-            <h2 className="text-2xl font-bold mb-4">My Savings Nudges</h2>
-            <div className="space-y-4">
-              {recommendations.map((rec) => (
-                <RecommendationCard
-                  key={rec.id}
-                  icon={rec.icon}
-                  title={rec.title}
-                  description={rec.description}
-                  saveAmount={rec.saveAmount}
-                  onSave={() => handleSave(rec.saveAmount)}
-                  onDismiss={handleDismiss}
-                />
-              ))}
+          <div className="space-y-6">
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-2xl font-bold">My Savings Goals</h2>
+                <Button onClick={() => navigate("/goals")} size="sm">
+                  <Plus className="w-4 h-4 mr-1" />
+                  Add New Goal
+                </Button>
+              </div>
+              <div className="space-y-4">
+                {goals.map((goal) => (
+                  <GoalCard
+                    key={goal.id}
+                    title={goal.name}
+                    current={goal.current}
+                    target={goal.target}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <h2 className="text-2xl font-bold mb-4">My Savings Nudges</h2>
+              <div className="space-y-4">
+                {recommendations.map((rec) => (
+                  <RecommendationCard
+                    key={rec.id}
+                    icon={rec.icon}
+                    title={rec.title}
+                    description={rec.description}
+                    saveAmount={rec.saveAmount}
+                    goals={goals}
+                    onSave={(goalId) => handleSave(rec.saveAmount, goalId)}
+                    onDismiss={handleDismiss}
+                  />
+                ))}
+              </div>
             </div>
           </div>
 

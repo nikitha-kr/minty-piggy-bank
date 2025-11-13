@@ -1,13 +1,16 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LucideIcon } from "lucide-react";
+import { useState } from "react";
 
 interface RecommendationCardProps {
   icon: LucideIcon;
   title: string;
   description: string;
   saveAmount: string;
-  onSave: () => void;
+  goals: { id: string; name: string }[];
+  onSave: (goalId: string) => void;
   onDismiss: () => void;
 }
 
@@ -16,9 +19,12 @@ export const RecommendationCard = ({
   title,
   description,
   saveAmount,
+  goals,
   onSave,
   onDismiss,
 }: RecommendationCardProps) => {
+  const [selectedGoal, setSelectedGoal] = useState<string>(goals[0]?.id || "");
+
   return (
     <Card className="p-4 hover:shadow-md transition-shadow">
       <div className="flex gap-3 mb-3">
@@ -30,8 +36,23 @@ export const RecommendationCard = ({
           <p className="text-sm text-muted-foreground">{description}</p>
         </div>
       </div>
+      <div className="mb-3">
+        <label className="text-xs text-muted-foreground mb-1 block">Save to Goal:</label>
+        <Select value={selectedGoal} onValueChange={setSelectedGoal}>
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {goals.map((goal) => (
+              <SelectItem key={goal.id} value={goal.id}>
+                {goal.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
       <div className="flex gap-2">
-        <Button onClick={onSave} className="flex-1">
+        <Button onClick={() => onSave(selectedGoal)} className="flex-1">
           Save {saveAmount}
         </Button>
         <Button onClick={onDismiss} variant="secondary" className="flex-1">

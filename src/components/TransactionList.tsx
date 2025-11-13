@@ -1,4 +1,6 @@
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Paperclip } from "lucide-react";
 
 interface Transaction {
   id: string;
@@ -28,7 +30,12 @@ export const TransactionList = ({ transactions }: TransactionListProps) => {
                 {transaction.category} • {transaction.timestamp}
               </p>
             </div>
-            <p className="font-semibold text-sm">{transaction.amount}</p>
+            <div className="flex items-center gap-3">
+              <p className="font-semibold text-sm">{transaction.amount}</p>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <Paperclip className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         ))}
       </div>

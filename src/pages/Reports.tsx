@@ -2,6 +2,15 @@ import { useState } from "react";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { FileText, Download } from "lucide-react";
 import { toast } from "sonner";
 
@@ -12,6 +21,11 @@ interface Report {
 }
 
 const Reports = () => {
+  const [vendor, setVendor] = useState("");
+  const [amount, setAmount] = useState("");
+  const [category, setCategory] = useState("");
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
   const [reports, setReports] = useState<Report[]>([
     {
       id: "1",
@@ -39,6 +53,19 @@ const Reports = () => {
     toast.success("New savings report generated!");
   };
 
+  const handleAddTransaction = () => {
+    if (!vendor || !amount || !category) {
+      toast.error("Please fill in all fields");
+      return;
+    }
+
+    toast.success(`Transaction added: ${vendor} - $${amount}`);
+    setVendor("");
+    setAmount("");
+    setCategory("");
+    setIsDialogOpen(false);
+  };
+
   const handleDownload = (reportName: string) => {
     toast.success(`Downloading ${reportName}`);
   };
@@ -53,6 +80,54 @@ const Reports = () => {
             Generate and download your savings summaries
           </p>
         </div>
+
+        <Card className="p-6 mb-8">
+          <h2 className="text-2xl font-bold mb-4">Add a New Transaction</h2>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="w-full">+ Add Transaction</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add a New Transaction</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-4">
+                <div>
+                  <Label htmlFor="vendor">Vendor Name</Label>
+                  <Input
+                    id="vendor"
+                    placeholder="e.g., Coffee Spot"
+                    value={vendor}
+                    onChange={(e) => setVendor(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="amount">Amount</Label>
+                  <Input
+                    id="amount"
+                    type="number"
+                    step="0.01"
+                    placeholder="e.g., 4.20"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="category">Category</Label>
+                  <Input
+                    id="category"
+                    placeholder="e.g., Food"
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                  />
+                </div>
+                <Button onClick={handleAddTransaction} className="w-full">
+                  Submit Transaction
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </Card>
 
         <Button 
           onClick={handleGenerateReport} 
