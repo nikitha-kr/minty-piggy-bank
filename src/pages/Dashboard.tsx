@@ -1,15 +1,49 @@
-import { useState } from "react";
 import { Header } from "@/components/Header";
 import { RecommendationCard } from "@/components/RecommendationCard";
-import { GoalCard } from "@/components/GoalCard";
 import { TransactionList } from "@/components/TransactionList";
 import { Button } from "@/components/ui/button";
-import { Coins, Coffee, ShoppingBag, Plus } from "lucide-react";
-import { toast } from "sonner";
+import { Card, CardContent } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Progress } from "@/components/ui/progress";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
+import { Coins, Coffee, ShoppingBag } from "lucide-react";
+import { toast } from "sonner";
+import { useState } from "react";
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const [userName] = useState("John Doe");
+  const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false);
+  const [newTransaction, setNewTransaction] = useState({
+    vendor: "",
+    amount: "",
+    category: "",
+    date: new Date().toISOString().split('T')[0]
+  });
+
+  const mainGoal = {
+    title: "Emergency Fund",
+    current: 150,
+    target: 500
+  };
+
+  const handleAddTransaction = () => {
+    if (!newTransaction.vendor || !newTransaction.amount || !newTransaction.category) {
+      toast.error("Please fill in all fields");
+      return;
+    }
+    toast.success(`Transaction added: ${newTransaction.vendor} - $${newTransaction.amount}`);
+    setIsAddTransactionOpen(false);
+    setNewTransaction({
+      vendor: "",
+      amount: "",
+      category: "",
+      date: new Date().toISOString().split('T')[0]
+    });
+  };
   
   const [goals] = useState([
     { id: "1", name: "Emergency Fund", current: 150, target: 500 },
@@ -88,32 +122,54 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-muted/30">
+    <div className="min-h-screen bg-background">
       <Header />
+      
       <main className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* User Welcome Section */}
+        <div className="mb-8 flex items-center gap-4">
+          <Avatar className="w-16 h-16">
+            <AvatarImage src="" />
+            <AvatarFallback className="bg-primary text-primary-foreground text-xl">
+              {userName.split(" ").map(n => n[0]).join("")}
+            </AvatarFallback>
+          </Avatar>
+          <div>
+            <h2 className="text-2xl font-bold">Welcome back, {userName}!</h2>
+            <p className="text-muted-foreground">Here's your savings overview</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="space-y-6">
-            <div>
+            {/* My Savings Goals */}
+            <section>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-2xl font-bold">My Savings Goals</h2>
-                <Button onClick={() => navigate("/goals")} size="sm">
-                  <Plus className="w-4 h-4 mr-1" />
-                  Add New Goal
-                </Button>
+                <Button onClick={() => navigate("/goals")}>View All Goals</Button>
               </div>
-              <div className="space-y-4">
-                {goals.map((goal) => (
-                  <GoalCard
-                    key={goal.id}
-                    title={goal.name}
-                    current={goal.current}
-                    target={goal.target}
-                  />
-                ))}
-              </div>
-            </div>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold text-lg">{mainGoal.title}</h3>
+                      <span className="text-sm text-muted-foreground">
+                        {Math.round((mainGoal.current / mainGoal.target) * 100)}%
+                      </span>
+                    </div>
+                    <div className="space-y-2">
+                      <Progress value={(mainGoal.current / mainGoal.target) * 100} className="h-3" />
+                      <p className="text-sm text-muted-foreground">
+                        ${mainGoal.current} / ${mainGoal.target}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </section>
 
-            <div>
+            {/* My Savings Nudges */}
+            <section>
               <h2 className="text-2xl font-bold mb-4">My Savings Nudges</h2>
               <div className="space-y-4">
                 {recommendations.map((rec) => (
@@ -129,11 +185,70 @@ const Dashboard = () => {
                   />
                 ))}
               </div>
-            </div>
+            </section>
           </div>
 
-          <div>
-            <TransactionList transactions={transactions} />
+          <div className="space-y-6">
+            {/* Transactions */}
+            <section>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-2xl font-bold">Recent Transactions</h2>
+                <Dialog open={isAddTransactionOpen} onOpenChange={setIsAddTransactionOpen}>
+                  <DialogTrigger asChild>
+                    <Button>+ Add Transaction</Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Add a New Transaction</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 mt-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="vendor">Vendor Name</Label>
+                        <Input
+                          id="vendor"
+                          placeholder="Coffee Spot"
+                          value={newTransaction.vendor}
+                          onChange={(e) => setNewTransaction({...newTransaction, vendor: e.target.value})}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="amount">Amount</Label>
+                        <Input
+                          id="amount"
+                          type="number"
+                          step="0.01"
+                          placeholder="4.20"
+                          value={newTransaction.amount}
+                          onChange={(e) => setNewTransaction({...newTransaction, amount: e.target.value})}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="category">Category</Label>
+                        <Input
+                          id="category"
+                          placeholder="Food"
+                          value={newTransaction.category}
+                          onChange={(e) => setNewTransaction({...newTransaction, category: e.target.value})}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="date">Date</Label>
+                        <Input
+                          id="date"
+                          type="date"
+                          value={newTransaction.date}
+                          onChange={(e) => setNewTransaction({...newTransaction, date: e.target.value})}
+                        />
+                      </div>
+                      <Button onClick={handleAddTransaction} className="w-full">
+                        Save Transaction
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
+              <TransactionList transactions={transactions} />
+            </section>
           </div>
         </div>
       </main>
