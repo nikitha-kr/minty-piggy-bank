@@ -26,13 +26,6 @@ export const Header = () => {
             Goals
           </NavLink>
           <NavLink 
-            to="/invest" 
-            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-            activeClassName="text-primary font-semibold"
-          >
-            Invest
-          </NavLink>
-          <NavLink 
             to="/rules" 
             className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
             activeClassName="text-primary font-semibold"
