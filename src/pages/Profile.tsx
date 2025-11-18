@@ -4,16 +4,66 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
 
 const Profile = () => {
-  const [name, setName] = useState("John Doe");
-  const [email, setEmail] = useState("john@example.com");
+  const navigate = useNavigate();
+  const { user, profile, signOut, refreshProfile } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [monthlyIncome, setMonthlyIncome] = useState("");
 
-  const handleSave = () => {
-    toast.success("Profile updated successfully!");
+  useEffect(() => {
+    if (!user) {
+      navigate("/");
+      return;
+    }
+    if (profile) {
+      setMonthlyIncome(profile.monthly_income?.toString() || "0");
+      setLoading(false);
+    }
+  }, [user, profile, navigate]);
+
+  const handleUpdateIncome = async () => {
+    if (!user || !monthlyIncome) {
+      toast.error("Please enter a valid amount");
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          monthly_income: parseFloat(monthlyIncome),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      toast.success("Monthly income updated successfully!");
+      await refreshProfile();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to update income");
+    }
   };
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      toast.success("Logged out successfully");
+      navigate("/");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to logout");
+    }
+  };
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -31,12 +81,12 @@ const Profile = () => {
                 <Avatar className="w-20 h-20">
                   <AvatarImage src="" />
                   <AvatarFallback className="bg-primary text-primary-foreground text-2xl">
-                    {name.split(" ").map(n => n[0]).join("")}
+                    {profile?.name.split(" ").map(n => n[0]).join("") || "U"}
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <h3 className="font-semibold">{name}</h3>
-                  <p className="text-sm text-muted-foreground">{email}</p>
+                  <h3 className="font-semibold">{profile?.name}</h3>
+                  <p className="text-sm text-muted-foreground">{profile?.email}</p>
                 </div>
               </div>
 
@@ -45,23 +95,41 @@ const Profile = () => {
                   <Label htmlFor="name">Name</Label>
                   <Input
                     id="name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
+                    value={profile?.name || ""}
+                    disabled
+                    className="bg-muted"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="email">Email ID</Label>
                   <Input
                     id="email"
                     type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    value={profile?.email || ""}
+                    disabled
+                    className="bg-muted"
                   />
                 </div>
 
-                <Button onClick={handleSave} className="w-full">
-                  Save Changes
+                <div className="space-y-2">
+                  <Label htmlFor="income">Monthly Income</Label>
+                  <Input
+                    id="income"
+                    type="number"
+                    step="0.01"
+                    placeholder="Enter your monthly income"
+                    value={monthlyIncome}
+                    onChange={(e) => setMonthlyIncome(e.target.value)}
+                  />
+                </div>
+
+                <Button onClick={handleUpdateIncome} className="w-full">
+                  Update Income
+                </Button>
+
+                <Button onClick={handleLogout} variant="destructive" className="w-full">
+                  Logout
                 </Button>
               </div>
             </CardContent>

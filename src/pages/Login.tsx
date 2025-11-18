@@ -1,34 +1,53 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import pigmintLogo from "@/assets/pigmint-logo.png";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Login = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { user, signIn, signUp } = useAuth();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (user) {
+      navigate("/dashboard");
+    }
+  }, [user, navigate]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isLogin) {
-      if (email.trim() && password.trim()) {
+    setLoading(true);
+
+    try {
+      if (isLogin) {
+        if (!email.trim() || !password.trim()) {
+          toast.error("Please enter your email and password");
+          return;
+        }
+        await signIn(email, password);
         toast.success("Welcome back to PigMint Finance!");
         navigate("/dashboard");
       } else {
-        toast.error("Please enter your email and password");
-      }
-    } else {
-      if (name.trim() && email.trim() && password.trim()) {
+        if (!name.trim() || !email.trim() || !password.trim()) {
+          toast.error("Please fill in all fields");
+          return;
+        }
+        await signUp(email, password, name);
         toast.success("Account created successfully!");
         navigate("/dashboard");
-      } else {
-        toast.error("Please fill in all fields");
       }
+    } catch (error: any) {
+      toast.error(error.message || "An error occurred");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -99,8 +118,8 @@ const Login = () => {
                 className="w-full"
               />
             </div>
-            <Button type="submit" className="w-full">
-              {isLogin ? "Login" : "Register"}
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Please wait..." : isLogin ? "Login" : "Register"}
             </Button>
           </form>
         </div>

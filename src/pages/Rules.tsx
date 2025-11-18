@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase, Rule as DbRule } from "@/lib/supabase";
 
 interface CustomRule {
   id: string;
@@ -21,34 +24,150 @@ interface CustomRule {
 }
 
 const Rules = () => {
-  const [autoRoundup, setAutoRoundup] = useState(true);
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [autoRoundup, setAutoRoundup] = useState(false);
+  const [autoRoundupRuleId, setAutoRoundupRuleId] = useState<string | null>(null);
   const [dailySave, setDailySave] = useState(false);
-  const [customRules, setCustomRules] = useState<CustomRule[]>([
-    { id: "1", vendor: "Starbucks", amount: "2.00" },
-  ]);
-
+  const [dailySaveRuleId, setDailySaveRuleId] = useState<string | null>(null);
+  const [customRules, setCustomRules] = useState<CustomRule[]>([]);
   const [vendor, setVendor] = useState("");
   const [amount, setAmount] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  const handleCreateRule = () => {
-    if (!vendor || !amount) {
+  useEffect(() => {
+    if (!user) {
+      navigate("/");
+      return;
+    }
+    fetchRules();
+  }, [user, navigate]);
+
+  const fetchRules = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('rules')
+        .select('*')
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      if (data) {
+        const roundupRule = data.find(r => r.type === 'automated' && r.name === 'Auto Round-Up');
+        const dailyRule = data.find(r => r.type === 'automated' && r.name === 'Daily Save $1');
+
+        if (roundupRule) {
+          setAutoRoundup(roundupRule.enabled);
+          setAutoRoundupRuleId(roundupRule.id);
+        }
+
+        if (dailyRule) {
+          setDailySave(dailyRule.enabled);
+          setDailySaveRuleId(dailyRule.id);
+        }
+
+        const custom = data.filter(r => r.type === 'custom').map(r => ({
+          id: r.id,
+          vendor: r.condition_value || '',
+          amount: r.action_amount?.toString() || '0',
+        }));
+
+        setCustomRules(custom);
+      }
+    } catch (error) {
+      console.error('Error fetching rules:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleToggleAutomatedRule = async (ruleType: 'roundup' | 'daily', enabled: boolean) => {
+    if (!user) return;
+
+    try {
+      const ruleName = ruleType === 'roundup' ? 'Auto Round-Up' : 'Daily Save $1';
+      const ruleId = ruleType === 'roundup' ? autoRoundupRuleId : dailySaveRuleId;
+
+      if (ruleId) {
+        const { error } = await supabase
+          .from('rules')
+          .update({ enabled })
+          .eq('id', ruleId);
+
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase
+          .from('rules')
+          .insert({
+            user_id: user.id,
+            name: ruleName,
+            type: 'automated',
+            enabled,
+            condition_type: null,
+            condition_value: null,
+            action_amount: ruleType === 'daily' ? 1 : null,
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        if (data) {
+          if (ruleType === 'roundup') {
+            setAutoRoundupRuleId(data.id);
+          } else {
+            setDailySaveRuleId(data.id);
+          }
+        }
+      }
+
+      if (ruleType === 'roundup') {
+        setAutoRoundup(enabled);
+      } else {
+        setDailySave(enabled);
+      }
+
+      toast.success(`Rule ${enabled ? 'enabled' : 'disabled'}`);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to update rule");
+    }
+  };
+
+  const handleCreateRule = async () => {
+    if (!vendor || !amount || !user) {
       toast.error("Please fill in all fields");
       return;
     }
 
-    const newRule: CustomRule = {
-      id: Date.now().toString(),
-      vendor,
-      amount,
-    };
+    try {
+      const { error } = await supabase.from('rules').insert({
+        user_id: user.id,
+        name: `Save $${amount} for ${vendor}`,
+        type: 'custom',
+        enabled: true,
+        condition_type: 'vendor',
+        condition_value: vendor,
+        action_amount: parseFloat(amount),
+      });
 
-    setCustomRules([...customRules, newRule]);
-    setVendor("");
-    setAmount("");
-    setIsDialogOpen(false);
-    toast.success("Rule created!");
+      if (error) throw error;
+
+      setVendor("");
+      setAmount("");
+      setIsDialogOpen(false);
+      toast.success("Rule created!");
+      fetchRules();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to create rule");
+    }
   };
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -65,7 +184,7 @@ const Rules = () => {
                 <Switch
                   id="auto-roundup"
                   checked={autoRoundup}
-                  onCheckedChange={setAutoRoundup}
+                  onCheckedChange={(checked) => handleToggleAutomatedRule('roundup', checked)}
                 />
               </div>
               <div className="flex items-center justify-between">
@@ -75,7 +194,7 @@ const Rules = () => {
                 <Switch
                   id="daily-save"
                   checked={dailySave}
-                  onCheckedChange={setDailySave}
+                  onCheckedChange={(checked) => handleToggleAutomatedRule('daily', checked)}
                 />
               </div>
             </div>

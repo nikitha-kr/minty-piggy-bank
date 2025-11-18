@@ -11,11 +11,13 @@ import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
 import { Coins, Coffee, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase, Goal, Transaction } from "@/lib/supabase";
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const [userName] = useState("John Doe");
+  const { user, profile } = useAuth();
   const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false);
   const [newTransaction, setNewTransaction] = useState({
     vendor: "",
@@ -23,34 +25,68 @@ const Dashboard = () => {
     category: "",
     date: new Date().toISOString().split('T')[0]
   });
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const mainGoal = {
-    title: "Emergency Fund",
-    current: 150,
-    target: 500
+  useEffect(() => {
+    if (!user) {
+      navigate("/");
+      return;
+    }
+    fetchData();
+  }, [user, navigate]);
+
+  const fetchData = async () => {
+    if (!user) return;
+
+    try {
+      const [goalsData, transactionsData] = await Promise.all([
+        supabase.from('goals').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+        supabase.from('transactions').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(5)
+      ]);
+
+      if (goalsData.data) setGoals(goalsData.data);
+      if (transactionsData.data) setTransactions(transactionsData.data);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleAddTransaction = () => {
-    if (!newTransaction.vendor || !newTransaction.amount || !newTransaction.category) {
+  const handleAddTransaction = async () => {
+    if (!newTransaction.vendor || !newTransaction.amount || !newTransaction.category || !user) {
       toast.error("Please fill in all fields");
       return;
     }
-    toast.success(`Transaction added: ${newTransaction.vendor} - $${newTransaction.amount}`);
-    setIsAddTransactionOpen(false);
-    setNewTransaction({
-      vendor: "",
-      amount: "",
-      category: "",
-      date: new Date().toISOString().split('T')[0]
-    });
-  };
-  
-  const [goals] = useState([
-    { id: "1", name: "Emergency Fund", current: 150, target: 500 },
-    { id: "2", name: "Vacation", current: 75, target: 1000 },
-  ]);
 
-  const [recommendations] = useState([
+    try {
+      const { error } = await supabase.from('transactions').insert({
+        user_id: user.id,
+        vendor: newTransaction.vendor,
+        amount: parseFloat(newTransaction.amount),
+        category: newTransaction.category,
+        date: newTransaction.date,
+      });
+
+      if (error) throw error;
+
+      toast.success(`Transaction added: ${newTransaction.vendor} - $${newTransaction.amount}`);
+      setIsAddTransactionOpen(false);
+      setNewTransaction({
+        vendor: "",
+        amount: "",
+        category: "",
+        date: new Date().toISOString().split('T')[0]
+      });
+      fetchData();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to add transaction");
+    }
+  };
+
+  const recommendations = [
     {
       id: "1",
       icon: Coins,
@@ -72,54 +108,64 @@ const Dashboard = () => {
       description: "Your online shopping at Fashion Store had a $5.45 round-up opportunity.",
       saveAmount: "$5.45",
     },
-  ]);
+  ];
 
-  const [transactions] = useState([
-    {
-      id: "1",
-      vendor: "Coffee Spot",
-      amount: "$4.20",
-      category: "Food",
-      timestamp: "Today, 2:30 PM",
-    },
-    {
-      id: "2",
-      vendor: "Fashion Store",
-      amount: "$64.55",
-      category: "Shopping",
-      timestamp: "Today, 11:15 AM",
-    },
-    {
-      id: "3",
-      vendor: "Quick Mart",
-      amount: "$12.89",
-      category: "Groceries",
-      timestamp: "Yesterday, 6:45 PM",
-    },
-    {
-      id: "4",
-      vendor: "Pizza Palace",
-      amount: "$18.75",
-      category: "Food",
-      timestamp: "Yesterday, 7:30 PM",
-    },
-    {
-      id: "5",
-      vendor: "Gas Station",
-      amount: "$45.00",
-      category: "Transportation",
-      timestamp: "2 days ago",
-    },
-  ]);
+  const handleSave = async (amount: string, goalId: string) => {
+    if (!user) return;
 
-  const handleSave = (amount: string, goalId: string) => {
     const goal = goals.find(g => g.id === goalId);
-    toast.success(`Great! You saved ${amount} to ${goal?.name || "your goal"}`);
+    const amountValue = parseFloat(amount.replace('$', ''));
+
+    try {
+      const { error: savingsError } = await supabase.from('savings_actions').insert({
+        user_id: user.id,
+        goal_id: goalId,
+        amount: amountValue,
+        type: 'manual',
+        description: `Saved ${amount} to ${goal?.name}`,
+      });
+
+      if (savingsError) throw savingsError;
+
+      const newAmount = (goal?.current_amount || 0) + amountValue;
+      const { error: goalError } = await supabase.from('goals').update({
+        current_amount: newAmount,
+        updated_at: new Date().toISOString(),
+      }).eq('id', goalId);
+
+      if (goalError) throw goalError;
+
+      toast.success(`Great! You saved ${amount} to ${goal?.name || "your goal"}`);
+      fetchData();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to save");
+    }
   };
 
   const handleDismiss = () => {
     toast("Recommendation dismissed");
   };
+
+  const mainGoal = goals[0] || null;
+
+  const formattedTransactions = transactions.map(t => ({
+    id: t.id,
+    vendor: t.vendor,
+    amount: `$${t.amount.toFixed(2)}`,
+    category: t.category,
+    timestamp: new Date(t.created_at).toLocaleDateString(),
+  }));
+
+  const goalsForCards = goals.map(g => ({
+    id: g.id,
+    name: g.name,
+    current: g.current_amount,
+    target: g.target_amount,
+  }));
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -131,11 +177,11 @@ const Dashboard = () => {
           <Avatar className="w-16 h-16">
             <AvatarImage src="" />
             <AvatarFallback className="bg-primary text-primary-foreground text-xl">
-              {userName.split(" ").map(n => n[0]).join("")}
+              {profile?.name.split(" ").map(n => n[0]).join("") || "U"}
             </AvatarFallback>
           </Avatar>
           <div>
-            <h2 className="text-2xl font-bold">Welcome back, {userName}!</h2>
+            <h2 className="text-2xl font-bold">Welcome back, {profile?.name || "User"}!</h2>
             <p className="text-muted-foreground">Here's your savings overview</p>
           </div>
         </div>
@@ -148,24 +194,32 @@ const Dashboard = () => {
                 <h2 className="text-2xl font-bold">My Savings Goals</h2>
                 <Button onClick={() => navigate("/goals")}>View All Goals</Button>
               </div>
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-semibold text-lg">{mainGoal.title}</h3>
-                      <span className="text-sm text-muted-foreground">
-                        {Math.round((mainGoal.current / mainGoal.target) * 100)}%
-                      </span>
+              {mainGoal ? (
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-semibold text-lg">{mainGoal.name}</h3>
+                        <span className="text-sm text-muted-foreground">
+                          {Math.round((mainGoal.current_amount / mainGoal.target_amount) * 100)}%
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        <Progress value={(mainGoal.current_amount / mainGoal.target_amount) * 100} className="h-3" />
+                        <p className="text-sm text-muted-foreground">
+                          ${mainGoal.current_amount.toFixed(2)} / ${mainGoal.target_amount.toFixed(2)}
+                        </p>
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <Progress value={(mainGoal.current / mainGoal.target) * 100} className="h-3" />
-                      <p className="text-sm text-muted-foreground">
-                        ${mainGoal.current} / ${mainGoal.target}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card>
+                  <CardContent className="pt-6 text-center text-muted-foreground">
+                    <p>No goals yet. Create one to get started!</p>
+                  </CardContent>
+                </Card>
+              )}
             </section>
 
             {/* My Savings Nudges */}
@@ -179,7 +233,7 @@ const Dashboard = () => {
                     title={rec.title}
                     description={rec.description}
                     saveAmount={rec.saveAmount}
-                    goals={goals}
+                    goals={goalsForCards}
                     onSave={(goalId) => handleSave(rec.saveAmount, goalId)}
                     onDismiss={handleDismiss}
                   />
@@ -247,7 +301,7 @@ const Dashboard = () => {
                   </DialogContent>
                 </Dialog>
               </div>
-              <TransactionList transactions={transactions} />
+              <TransactionList transactions={formattedTransactions} />
             </section>
           </div>
         </div>

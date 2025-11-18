@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { GoalCard } from "@/components/GoalCard";
 import { Card } from "@/components/ui/card";
@@ -6,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase, Goal as DbGoal } from "@/lib/supabase";
 
 interface Goal {
   id: string;
@@ -15,32 +18,76 @@ interface Goal {
 }
 
 const Goals = () => {
-  const [goals, setGoals] = useState<Goal[]>([
-    { id: "1", name: "Emergency Fund", current: 150, target: 500 },
-    { id: "2", name: "Vacation", current: 75, target: 1000 },
-  ]);
-
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [loading, setLoading] = useState(true);
   const [goalName, setGoalName] = useState("");
   const [totalAmount, setTotalAmount] = useState("");
 
-  const handleCreateGoal = () => {
-    if (!goalName || !totalAmount) {
+  useEffect(() => {
+    if (!user) {
+      navigate("/");
+      return;
+    }
+    fetchGoals();
+  }, [user, navigate]);
+
+  const fetchGoals = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('goals')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      if (data) {
+        setGoals(data.map(g => ({
+          id: g.id,
+          name: g.name,
+          current: g.current_amount,
+          target: g.target_amount,
+        })));
+      }
+    } catch (error) {
+      console.error('Error fetching goals:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateGoal = async () => {
+    if (!goalName || !totalAmount || !user) {
       toast.error("Please fill in all fields");
       return;
     }
 
-    const newGoal: Goal = {
-      id: Date.now().toString(),
-      name: goalName,
-      current: 0,
-      target: parseFloat(totalAmount),
-    };
+    try {
+      const { error } = await supabase.from('goals').insert({
+        user_id: user.id,
+        name: goalName,
+        target_amount: parseFloat(totalAmount),
+        current_amount: 0,
+      });
 
-    setGoals([...goals, newGoal]);
-    setGoalName("");
-    setTotalAmount("");
-    toast.success(`Goal "${goalName}" created!`);
+      if (error) throw error;
+
+      setGoalName("");
+      setTotalAmount("");
+      toast.success(`Goal "${goalName}" created!`);
+      fetchGoals();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to create goal");
+    }
   };
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
 
   return (
     <div className="min-h-screen bg-muted/30">
