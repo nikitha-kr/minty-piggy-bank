@@ -39,6 +39,13 @@ export const Header = () => {
           >
             Reports
           </NavLink>
+          <NavLink 
+            to="/profile" 
+            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            activeClassName="text-primary font-semibold"
+          >
+            Profile
+          </NavLink>
         </nav>
       </div>
     </header>
