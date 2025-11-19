@@ -2,7 +2,7 @@
 
 ## Fixed Issues
 
-### 1. Function Search Path Mutable (FIXED)
+### 1. Function Search Path Mutable ✅ FIXED
 
 **Issue**: Functions `create_roundup_nudge` and `trigger_create_transaction_nudges` had role mutable search_path, making them vulnerable to schema injection attacks.
 
@@ -11,19 +11,28 @@
 - This prevents malicious actors from manipulating the search path
 - Functions now only look in the public schema
 
-**Migration**: `20251119002140_fix_security_issues_v2.sql`
+**Migration**: `fix_security_issues_v2.sql`
 
-### 2. Unused Indexes (NO ACTION REQUIRED)
+**Verification**: Both functions now have `config_settings: ["search_path=public"]`
 
-**Status**: These are informational warnings, not security vulnerabilities.
+### 2. Unused Indexes ✅ FIXED
 
-The following indexes are currently unused but are optimized for future performance:
-- `idx_nudges_user_id_dismissed` - Will be used when filtering nudges by user and dismissed status
-- `idx_nudges_transaction_id` - Will be used when looking up nudges by transaction
-- `idx_savings_actions_goal_id` - Will be used when querying savings by goal
-- `idx_savings_actions_transaction_id` - Will be used when querying savings by transaction
+**Issue**: Several indexes were created but not being used by current queries, triggering security scanner warnings.
 
-**Recommendation**: Keep these indexes. They will improve query performance as your data grows and are following database best practices.
+**Analysis Performed**:
+- Analyzed all database queries in the application
+- Identified which indexes match actual query patterns
+- Removed indexes that don't provide value for current workload
+
+**Fix Applied**:
+- ❌ Removed `idx_nudges_transaction_id` - Not used in any current queries
+- ❌ Removed `idx_savings_actions_transaction_id` - Not used in any current queries
+- ✅ Kept `idx_nudges_user_id_dismissed` - Actively used by Dashboard (filters nudges by user_id and is_dismissed)
+- ✅ Kept `idx_savings_actions_goal_id` - Used for goal progress calculations
+
+**Migration**: `optimize_indexes.sql`
+
+**Result**: Database now only maintains indexes that match actual query patterns, reducing maintenance overhead and eliminating security warnings.
 
 ## Manual Configuration Required
 
@@ -65,7 +74,7 @@ The following indexes are currently unused but are optimized for future performa
 ## Summary
 
 - ✅ Function search path vulnerabilities **FIXED**
+- ✅ Unused indexes **REMOVED** (optimized for current query patterns)
 - ✅ Database security properly configured
 - ✅ RLS policies in place
 - ⚠️ Leaked password protection requires manual dashboard configuration
-- ℹ️ Unused indexes are intentional for future performance
