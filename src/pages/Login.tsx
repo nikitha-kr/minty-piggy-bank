@@ -52,14 +52,14 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-accent p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center mb-4">
-            <img src={pigmintLogo} alt="PigMint Finance Logo" className="w-32 h-32" />
+          <div className="inline-flex items-center justify-center mb-6">
+            <img src={pigmintLogo} alt="PigMint Finance Logo" className="w-40 h-40" />
           </div>
-          <h1 className="text-4xl font-bold mb-2">PigMint Finance</h1>
-          <p className="text-muted-foreground">Your daily savings, one mint at a time.</p>
+          <h1 className="text-5xl font-bold mb-3 text-primary">PigMint Finance</h1>
+          <p className="text-lg text-foreground/70 font-medium">Your daily savings, one mint at a time.</p>
         </div>
 
         <div className="bg-card p-8 rounded-lg shadow-lg">

@@ -1,7 +1,6 @@
 import { Card } from "@/components/ui/card";
-import { Paperclip, Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
 
 interface Transaction {
   id: string;
@@ -13,20 +12,11 @@ interface Transaction {
 
 interface TransactionListProps {
   transactions: Transaction[];
+  onEdit: (transaction: Transaction) => void;
+  onDelete: (id: string) => void;
 }
 
-export const TransactionList = ({ transactions }: TransactionListProps) => {
-  const handleEdit = (id: string, vendor: string) => {
-    toast.info(`Edit transaction: ${vendor}`);
-  };
-
-  const handleDelete = (id: string, vendor: string) => {
-    toast.success(`Deleted transaction: ${vendor}`);
-  };
-
-  const handleUpload = (vendor: string) => {
-    toast.info(`Upload bill for: ${vendor}`);
-  };
+export const TransactionList = ({ transactions, onEdit, onDelete }: TransactionListProps) => {
 
   return (
     <Card className="p-4">
@@ -45,27 +35,21 @@ export const TransactionList = ({ transactions }: TransactionListProps) => {
             <div className="flex items-center gap-3">
               <p className="font-semibold text-sm">{transaction.amount}</p>
               <div className="flex items-center gap-1">
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   size="icon"
                   className="h-8 w-8"
-                  onClick={() => handleUpload(transaction.vendor)}
-                >
-                  <Paperclip className="h-4 w-4" />
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => handleEdit(transaction.id, transaction.vendor)}
+                  onClick={() => onEdit(transaction)}
+                  title="Edit transaction"
                 >
                   <Pencil className="h-4 w-4" />
                 </Button>
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   size="icon"
                   className="h-8 w-8 text-destructive hover:text-destructive"
-                  onClick={() => handleDelete(transaction.id, transaction.vendor)}
+                  onClick={() => onDelete(transaction.id)}
+                  title="Delete transaction"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>

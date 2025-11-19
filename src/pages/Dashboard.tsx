@@ -19,6 +19,8 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
   const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
   const [newTransaction, setNewTransaction] = useState({
     vendor: "",
     amount: "",
@@ -62,18 +64,34 @@ const Dashboard = () => {
     }
 
     try {
-      const { error } = await supabase.from('transactions').insert({
-        user_id: user.id,
-        vendor: newTransaction.vendor,
-        amount: parseFloat(newTransaction.amount),
-        category: newTransaction.category,
-        date: newTransaction.date,
-      });
+      if (isEditMode && editingTransactionId) {
+        const { error } = await supabase.from('transactions').update({
+          vendor: newTransaction.vendor,
+          amount: parseFloat(newTransaction.amount),
+          category: newTransaction.category,
+          date: newTransaction.date,
+        }).eq('id', editingTransactionId);
 
-      if (error) throw error;
+        if (error) throw error;
 
-      toast.success(`Transaction added: ${newTransaction.vendor} - $${newTransaction.amount}`);
+        toast.success(`Transaction updated`);
+      } else {
+        const { error } = await supabase.from('transactions').insert({
+          user_id: user.id,
+          vendor: newTransaction.vendor,
+          amount: parseFloat(newTransaction.amount),
+          category: newTransaction.category,
+          date: newTransaction.date,
+        });
+
+        if (error) throw error;
+
+        toast.success(`Transaction added: ${newTransaction.vendor} - $${newTransaction.amount}`);
+      }
+
       setIsAddTransactionOpen(false);
+      setIsEditMode(false);
+      setEditingTransactionId(null);
       setNewTransaction({
         vendor: "",
         amount: "",
@@ -82,7 +100,37 @@ const Dashboard = () => {
       });
       fetchData();
     } catch (error: any) {
-      toast.error(error.message || "Failed to add transaction");
+      toast.error(error.message || "Failed to save transaction");
+    }
+  };
+
+  const handleEditTransaction = (transaction: any) => {
+    const originalTransaction = transactions.find(t => t.id === transaction.id);
+    if (originalTransaction) {
+      setNewTransaction({
+        vendor: originalTransaction.vendor,
+        amount: originalTransaction.amount.toString(),
+        category: originalTransaction.category,
+        date: originalTransaction.date,
+      });
+      setEditingTransactionId(transaction.id);
+      setIsEditMode(true);
+      setIsAddTransactionOpen(true);
+    }
+  };
+
+  const handleDeleteTransaction = async (id: string) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase.from('transactions').delete().eq('id', id);
+
+      if (error) throw error;
+
+      toast.success("Transaction deleted");
+      fetchData();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to delete transaction");
     }
   };
 
@@ -249,11 +297,20 @@ const Dashboard = () => {
                 <h2 className="text-2xl font-bold">Recent Transactions</h2>
                 <Dialog open={isAddTransactionOpen} onOpenChange={setIsAddTransactionOpen}>
                   <DialogTrigger asChild>
-                    <Button>+ Add Transaction</Button>
+                    <Button onClick={() => {
+                      setIsEditMode(false);
+                      setEditingTransactionId(null);
+                      setNewTransaction({
+                        vendor: "",
+                        amount: "",
+                        category: "",
+                        date: new Date().toISOString().split('T')[0]
+                      });
+                    }}>+ Add Transaction</Button>
                   </DialogTrigger>
                   <DialogContent>
                     <DialogHeader>
-                      <DialogTitle>Add a New Transaction</DialogTitle>
+                      <DialogTitle>{isEditMode ? 'Edit Transaction' : 'Add a New Transaction'}</DialogTitle>
                     </DialogHeader>
                     <div className="space-y-4 mt-4">
                       <div className="space-y-2">
@@ -301,7 +358,11 @@ const Dashboard = () => {
                   </DialogContent>
                 </Dialog>
               </div>
-              <TransactionList transactions={formattedTransactions} />
+              <TransactionList
+                transactions={formattedTransactions}
+                onEdit={handleEditTransaction}
+                onDelete={handleDeleteTransaction}
+              />
             </section>
           </div>
         </div>
