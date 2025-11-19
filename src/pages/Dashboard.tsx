@@ -13,7 +13,7 @@ import { Coins, Coffee, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase, Goal, Transaction } from "@/lib/supabase";
+import { supabase, Goal, Transaction, Nudge } from "@/lib/supabase";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -29,6 +29,7 @@ const Dashboard = () => {
   });
   const [goals, setGoals] = useState<Goal[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [nudges, setNudges] = useState<Nudge[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -43,13 +44,15 @@ const Dashboard = () => {
     if (!user) return;
 
     try {
-      const [goalsData, transactionsData] = await Promise.all([
+      const [goalsData, transactionsData, nudgesData] = await Promise.all([
         supabase.from('goals').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
-        supabase.from('transactions').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(5)
+        supabase.from('transactions').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(5),
+        supabase.from('nudges').select('*').eq('user_id', user.id).eq('is_dismissed', false).order('created_at', { ascending: false })
       ]);
 
       if (goalsData.data) setGoals(goalsData.data);
       if (transactionsData.data) setTransactions(transactionsData.data);
+      if (nudgesData.data) setNudges(nudgesData.data);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -134,29 +137,26 @@ const Dashboard = () => {
     }
   };
 
-  const recommendations = [
-    {
-      id: "1",
-      icon: Coins,
-      title: "Round-Up & Save",
-      description: "You spent $4.20 at Coffee Spot. Want to save the $0.80 round-up?",
-      saveAmount: "$0.80",
-    },
-    {
-      id: "2",
-      icon: Coffee,
-      title: "Coffee Savings",
-      description: "You've bought coffee 3 times this week. Brewing at home could save you $15/week!",
-      saveAmount: "$15",
-    },
-    {
-      id: "3",
-      icon: ShoppingBag,
-      title: "Shopping Smart",
-      description: "Your online shopping at Fashion Store had a $5.45 round-up opportunity.",
-      saveAmount: "$5.45",
-    },
-  ];
+  const getIconForNudgeType = (type: string) => {
+    switch (type) {
+      case 'round_up':
+        return Coins;
+      case 'vendor_pattern':
+        return Coffee;
+      case 'category_pattern':
+        return ShoppingBag;
+      default:
+        return Coins;
+    }
+  };
+
+  const recommendations = nudges.map(nudge => ({
+    id: nudge.id,
+    icon: getIconForNudgeType(nudge.nudge_type),
+    title: nudge.title,
+    description: nudge.description,
+    saveAmount: `$${nudge.save_amount.toFixed(2)}`,
+  }));
 
   const handleSave = async (amount: string, goalId: string) => {
     if (!user) return;
@@ -190,8 +190,22 @@ const Dashboard = () => {
     }
   };
 
-  const handleDismiss = () => {
-    toast("Recommendation dismissed");
+  const handleDismiss = async (nudgeId: string) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('nudges')
+        .update({ is_dismissed: true })
+        .eq('id', nudgeId);
+
+      if (error) throw error;
+
+      setNudges(nudges.filter(n => n.id !== nudgeId));
+      toast("Recommendation dismissed");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to dismiss");
+    }
   };
 
   const mainGoal = goals[0] || null;
@@ -274,18 +288,26 @@ const Dashboard = () => {
             <section>
               <h2 className="text-2xl font-bold mb-4">My Savings Nudges</h2>
               <div className="space-y-4">
-                {recommendations.map((rec) => (
-                  <RecommendationCard
-                    key={rec.id}
-                    icon={rec.icon}
-                    title={rec.title}
-                    description={rec.description}
-                    saveAmount={rec.saveAmount}
-                    goals={goalsForCards}
-                    onSave={(goalId) => handleSave(rec.saveAmount, goalId)}
-                    onDismiss={handleDismiss}
-                  />
-                ))}
+                {recommendations.length > 0 ? (
+                  recommendations.map((rec) => (
+                    <RecommendationCard
+                      key={rec.id}
+                      icon={rec.icon}
+                      title={rec.title}
+                      description={rec.description}
+                      saveAmount={rec.saveAmount}
+                      goals={goalsForCards}
+                      onSave={(goalId) => handleSave(rec.saveAmount, goalId)}
+                      onDismiss={() => handleDismiss(rec.id)}
+                    />
+                  ))
+                ) : (
+                  <Card>
+                    <CardContent className="pt-6 text-center text-muted-foreground">
+                      <p>No savings nudges at the moment. Add transactions to get personalized savings suggestions!</p>
+                    </CardContent>
+                  </Card>
+                )}
               </div>
             </section>
           </div>

@@ -60,3 +60,15 @@ export type SavingsAction = {
   description: string;
   created_at: string;
 };
+
+export type Nudge = {
+  id: string;
+  user_id: string;
+  transaction_id: string;
+  title: string;
+  description: string;
+  save_amount: number;
+  nudge_type: string;
+  is_dismissed: boolean;
+  created_at: string;
+};
