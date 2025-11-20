@@ -159,20 +159,56 @@ export const parseCSVFile = async (file: File): Promise<ParsedTransaction[]> => 
 };
 
 export const parseImageFile = async (file: File): Promise<ParsedTransaction[]> => {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
+  try {
+    console.log('Processing receipt image with OCR:', file.name);
 
-    reader.onload = () => {
-      resolve([{
-        vendor: 'Receipt from ' + file.name.split('.')[0],
-        amount: 0,
-        category: 'Receipt',
-        date: new Date().toISOString().split('T')[0],
-      }]);
-    };
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-    reader.readAsDataURL(file);
-  });
+    if (!supabaseUrl || !supabaseAnonKey) {
+      throw new Error('Supabase configuration missing');
+    }
+
+    const formData = new FormData();
+    formData.append('image', file);
+
+    const response = await fetch(`${supabaseUrl}/functions/v1/process-receipt-ocr`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${supabaseAnonKey}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`OCR request failed: ${errorText}`);
+    }
+
+    const result = await response.json();
+
+    if (result.error) {
+      console.warn('OCR processing warning:', result.error);
+    }
+
+    console.log('OCR result:', result);
+
+    return [{
+      vendor: result.vendor || 'Unknown Merchant',
+      amount: result.amount || 0,
+      category: result.category || 'Uncategorized',
+      date: result.date || new Date().toISOString().split('T')[0],
+    }];
+  } catch (error: any) {
+    console.error('OCR processing error:', error);
+
+    return [{
+      vendor: 'Receipt from ' + file.name.split('.')[0],
+      amount: 0,
+      category: 'Uncategorized',
+      date: new Date().toISOString().split('T')[0],
+    }];
+  }
 };
 
 export const parsePDFFile = async (file: File): Promise<ParsedTransaction[]> => {
