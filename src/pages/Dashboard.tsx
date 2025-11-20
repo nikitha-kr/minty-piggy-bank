@@ -8,8 +8,10 @@ import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate } from "react-router-dom";
-import { Coins, Coffee, ShoppingBag } from "lucide-react";
+import { Coins, Coffee, ShoppingBag, Upload, FileSpreadsheet } from "lucide-react";
+import { parseFile, ParsedTransaction } from "@/lib/fileParser";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -31,6 +33,8 @@ const Dashboard = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [nudges, setNudges] = useState<Nudge[]>([]);
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [parsedTransactions, setParsedTransactions] = useState<ParsedTransaction[]>([]);
 
   useEffect(() => {
     if (!user) {
@@ -208,6 +212,51 @@ const Dashboard = () => {
     }
   };
 
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const parsed = await parseFile(file);
+      setParsedTransactions(parsed);
+      toast.success(`Found ${parsed.length} transactions in file`);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to parse file");
+      setParsedTransactions([]);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleImportTransactions = async () => {
+    if (!user || parsedTransactions.length === 0) return;
+
+    setUploading(true);
+    try {
+      const transactionsToInsert = parsedTransactions.map(t => ({
+        user_id: user.id,
+        vendor: t.vendor,
+        amount: t.amount,
+        category: t.category,
+        date: t.date,
+      }));
+
+      const { error } = await supabase.from('transactions').insert(transactionsToInsert);
+
+      if (error) throw error;
+
+      toast.success(`Imported ${parsedTransactions.length} transactions`);
+      setParsedTransactions([]);
+      setIsAddTransactionOpen(false);
+      fetchData();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to import transactions");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const mainGoal = goals[0] || null;
 
   const formattedTransactions = transactions.map(t => ({
@@ -317,7 +366,12 @@ const Dashboard = () => {
             <section>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-2xl font-bold">Recent Transactions</h2>
-                <Dialog open={isAddTransactionOpen} onOpenChange={setIsAddTransactionOpen}>
+                <Dialog open={isAddTransactionOpen} onOpenChange={(open) => {
+                  setIsAddTransactionOpen(open);
+                  if (!open) {
+                    setParsedTransactions([]);
+                  }
+                }}>
                   <DialogTrigger asChild>
                     <Button onClick={() => {
                       setIsEditMode(false);
@@ -328,55 +382,158 @@ const Dashboard = () => {
                         category: "",
                         date: new Date().toISOString().split('T')[0]
                       });
+                      setParsedTransactions([]);
                     }}>+ Add Transaction</Button>
                   </DialogTrigger>
-                  <DialogContent>
+                  <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
-                      <DialogTitle>{isEditMode ? 'Edit Transaction' : 'Add a New Transaction'}</DialogTitle>
+                      <DialogTitle>{isEditMode ? 'Edit Transaction' : 'Add Transactions'}</DialogTitle>
                     </DialogHeader>
-                    <div className="space-y-4 mt-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="vendor">Vendor Name</Label>
-                        <Input
-                          id="vendor"
-                          placeholder="Coffee Spot"
-                          value={newTransaction.vendor}
-                          onChange={(e) => setNewTransaction({...newTransaction, vendor: e.target.value})}
-                        />
+
+                    {!isEditMode ? (
+                      <Tabs defaultValue="manual" className="mt-4">
+                        <TabsList className="grid w-full grid-cols-2">
+                          <TabsTrigger value="manual">Manual Entry</TabsTrigger>
+                          <TabsTrigger value="upload">Upload File</TabsTrigger>
+                        </TabsList>
+
+                        <TabsContent value="manual" className="space-y-4 mt-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="vendor">Vendor Name</Label>
+                            <Input
+                              id="vendor"
+                              placeholder="Coffee Spot"
+                              value={newTransaction.vendor}
+                              onChange={(e) => setNewTransaction({...newTransaction, vendor: e.target.value})}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="amount">Amount</Label>
+                            <Input
+                              id="amount"
+                              type="number"
+                              step="0.01"
+                              placeholder="4.20"
+                              value={newTransaction.amount}
+                              onChange={(e) => setNewTransaction({...newTransaction, amount: e.target.value})}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="category">Category</Label>
+                            <Input
+                              id="category"
+                              placeholder="Food"
+                              value={newTransaction.category}
+                              onChange={(e) => setNewTransaction({...newTransaction, category: e.target.value})}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="date">Date</Label>
+                            <Input
+                              id="date"
+                              type="date"
+                              value={newTransaction.date}
+                              onChange={(e) => setNewTransaction({...newTransaction, date: e.target.value})}
+                            />
+                          </div>
+                          <Button onClick={handleAddTransaction} className="w-full">
+                            Save Transaction
+                          </Button>
+                        </TabsContent>
+
+                        <TabsContent value="upload" className="space-y-4 mt-4">
+                          <div className="border-2 border-dashed rounded-lg p-8 text-center">
+                            <FileSpreadsheet className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                            <h3 className="text-lg font-semibold mb-2">Upload Transaction File</h3>
+                            <p className="text-sm text-muted-foreground mb-4">
+                              Supports Excel (.xlsx, .xls), CSV, PDF, and images (JPG, PNG)
+                            </p>
+                            <Label htmlFor="file-upload" className="cursor-pointer">
+                              <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90">
+                                <Upload className="h-4 w-4" />
+                                {uploading ? 'Processing...' : 'Choose File'}
+                              </div>
+                              <Input
+                                id="file-upload"
+                                type="file"
+                                accept=".xlsx,.xls,.csv,.pdf,.jpg,.jpeg,.png"
+                                className="hidden"
+                                onChange={handleFileUpload}
+                                disabled={uploading}
+                              />
+                            </Label>
+                          </div>
+
+                          {parsedTransactions.length > 0 && (
+                            <div className="space-y-4">
+                              <div className="bg-muted p-4 rounded-lg">
+                                <h4 className="font-semibold mb-2">Preview ({parsedTransactions.length} transactions)</h4>
+                                <div className="max-h-60 overflow-y-auto space-y-2">
+                                  {parsedTransactions.slice(0, 10).map((t, idx) => (
+                                    <div key={idx} className="text-sm bg-background p-2 rounded flex justify-between">
+                                      <span className="font-medium">{t.vendor}</span>
+                                      <span className="text-muted-foreground">${t.amount.toFixed(2)} - {t.category}</span>
+                                    </div>
+                                  ))}
+                                  {parsedTransactions.length > 10 && (
+                                    <p className="text-xs text-muted-foreground text-center">
+                                      + {parsedTransactions.length - 10} more transactions
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                              <Button onClick={handleImportTransactions} className="w-full" disabled={uploading}>
+                                {uploading ? 'Importing...' : `Import ${parsedTransactions.length} Transactions`}
+                              </Button>
+                            </div>
+                          )}
+                        </TabsContent>
+                      </Tabs>
+                    ) : (
+                      <div className="space-y-4 mt-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="vendor">Vendor Name</Label>
+                          <Input
+                            id="vendor"
+                            placeholder="Coffee Spot"
+                            value={newTransaction.vendor}
+                            onChange={(e) => setNewTransaction({...newTransaction, vendor: e.target.value})}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="amount">Amount</Label>
+                          <Input
+                            id="amount"
+                            type="number"
+                            step="0.01"
+                            placeholder="4.20"
+                            value={newTransaction.amount}
+                            onChange={(e) => setNewTransaction({...newTransaction, amount: e.target.value})}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="category">Category</Label>
+                          <Input
+                            id="category"
+                            placeholder="Food"
+                            value={newTransaction.category}
+                            onChange={(e) => setNewTransaction({...newTransaction, category: e.target.value})}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="date">Date</Label>
+                          <Input
+                            id="date"
+                            type="date"
+                            value={newTransaction.date}
+                            onChange={(e) => setNewTransaction({...newTransaction, date: e.target.value})}
+                          />
+                        </div>
+                        <Button onClick={handleAddTransaction} className="w-full">
+                          Save Transaction
+                        </Button>
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="amount">Amount</Label>
-                        <Input
-                          id="amount"
-                          type="number"
-                          step="0.01"
-                          placeholder="4.20"
-                          value={newTransaction.amount}
-                          onChange={(e) => setNewTransaction({...newTransaction, amount: e.target.value})}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="category">Category</Label>
-                        <Input
-                          id="category"
-                          placeholder="Food"
-                          value={newTransaction.category}
-                          onChange={(e) => setNewTransaction({...newTransaction, category: e.target.value})}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="date">Date</Label>
-                        <Input
-                          id="date"
-                          type="date"
-                          value={newTransaction.date}
-                          onChange={(e) => setNewTransaction({...newTransaction, date: e.target.value})}
-                        />
-                      </div>
-                      <Button onClick={handleAddTransaction} className="w-full">
-                        Save Transaction
-                      </Button>
-                    </div>
+                    )}
                   </DialogContent>
                 </Dialog>
               </div>
