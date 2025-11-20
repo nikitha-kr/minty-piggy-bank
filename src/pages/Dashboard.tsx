@@ -158,7 +158,7 @@ const Dashboard = () => {
     saveAmount: `$${nudge.save_amount.toFixed(2)}`,
   }));
 
-  const handleSave = async (amount: string, goalId: string) => {
+  const handleSave = async (amount: string, goalId: string, nudgeId: string) => {
     if (!user) return;
 
     const goal = goals.find(g => g.id === goalId);
@@ -182,6 +182,13 @@ const Dashboard = () => {
       }).eq('id', goalId);
 
       if (goalError) throw goalError;
+
+      const { error: dismissError } = await supabase
+        .from('nudges')
+        .update({ is_dismissed: true })
+        .eq('id', nudgeId);
+
+      if (dismissError) throw dismissError;
 
       toast.success(`Great! You saved ${amount} to ${goal?.name || "your goal"}`);
       fetchData();
@@ -297,7 +304,7 @@ const Dashboard = () => {
                       description={rec.description}
                       saveAmount={rec.saveAmount}
                       goals={goalsForCards}
-                      onSave={(goalId) => handleSave(rec.saveAmount, goalId)}
+                      onSave={(goalId) => handleSave(rec.saveAmount, goalId, rec.id)}
                       onDismiss={() => handleDismiss(rec.id)}
                     />
                   ))
