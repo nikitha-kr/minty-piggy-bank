@@ -187,18 +187,57 @@ export const parsePDFFile = async (file: File): Promise<ParsedTransaction[]> => 
 };
 
 const formatDate = (dateInput: any): string => {
-  if (!dateInput) return new Date().toISOString().split('T')[0];
+  if (!dateInput || dateInput === '') return new Date().toISOString().split('T')[0];
 
   if (typeof dateInput === 'number') {
-    const date = XLSX.SSF.parse_date_code(dateInput);
-    return `${date.y}-${String(date.m).padStart(2, '0')}-${String(date.d).padStart(2, '0')}`;
+    try {
+      if (dateInput < 1 || dateInput > 2958465) {
+        return new Date().toISOString().split('T')[0];
+      }
+
+      const date = XLSX.SSF.parse_date_code(dateInput);
+
+      if (!date || !date.y || date.y < 1900 || date.y > 2100) {
+        return new Date().toISOString().split('T')[0];
+      }
+
+      return `${date.y}-${String(date.m).padStart(2, '0')}-${String(date.d).padStart(2, '0')}`;
+    } catch {
+      return new Date().toISOString().split('T')[0];
+    }
   }
 
   try {
+    const dateStr = String(dateInput).trim();
+
+    if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      const [year, month, day] = dateStr.split('-').map(Number);
+      if (year >= 1900 && year <= 2100 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+        return dateStr;
+      }
+    }
+
+    if (dateStr.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) {
+      const [month, day, year] = dateStr.split('/').map(Number);
+      if (year >= 1900 && year <= 2100 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+        return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      }
+    }
+
+    if (dateStr.match(/^\d{1,2}-\d{1,2}-\d{4}$/)) {
+      const [month, day, year] = dateStr.split('-').map(Number);
+      if (year >= 1900 && year <= 2100 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+        return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      }
+    }
+
     const date = new Date(dateInput);
-    if (isNaN(date.getTime())) {
+    const year = date.getFullYear();
+
+    if (isNaN(date.getTime()) || year < 1900 || year > 2100) {
       return new Date().toISOString().split('T')[0];
     }
+
     return date.toISOString().split('T')[0];
   } catch {
     return new Date().toISOString().split('T')[0];
