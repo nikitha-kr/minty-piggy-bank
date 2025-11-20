@@ -8,6 +8,33 @@ export interface ParsedTransaction {
   date: string;
 }
 
+const extractField = (row: any, fieldNames: string[]): string => {
+  for (const name of fieldNames) {
+    const lowerName = name.toLowerCase();
+    for (const key in row) {
+      if (key.toLowerCase().includes(lowerName)) {
+        const value = row[key];
+        if (value !== null && value !== undefined && value !== '') {
+          return String(value);
+        }
+      }
+    }
+  }
+  return '';
+};
+
+const parseAmount = (amountStr: string): number => {
+  if (!amountStr) return 0;
+
+  const cleaned = String(amountStr)
+    .replace(/[$€£¥,\s]/g, '')
+    .replace(/[()]/g, '-')
+    .trim();
+
+  const amount = parseFloat(cleaned);
+  return isNaN(amount) ? 0 : Math.abs(amount);
+};
+
 export const parseExcelFile = async (file: File): Promise<ParsedTransaction[]> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -19,23 +46,47 @@ export const parseExcelFile = async (file: File): Promise<ParsedTransaction[]> =
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
         const jsonData = XLSX.utils.sheet_to_json(firstSheet);
 
+        console.log('Excel data parsed:', jsonData);
+
+        if (!jsonData || jsonData.length === 0) {
+          reject(new Error('No data found in Excel file'));
+          return;
+        }
+
         const transactions = jsonData.map((row: any) => {
-          const vendor = row.vendor || row.Vendor || row.VENDOR || row.description || row.Description || '';
-          const amount = parseFloat(row.amount || row.Amount || row.AMOUNT || row.total || row.Total || '0');
-          const category = row.category || row.Category || row.CATEGORY || 'Uncategorized';
-          const date = row.date || row.Date || row.DATE || new Date().toISOString().split('T')[0];
+          const vendor = extractField(row, [
+            'vendor', 'merchant', 'description', 'name', 'payee', 'store', 'shop'
+          ]);
+
+          const amountStr = extractField(row, [
+            'amount', 'total', 'price', 'cost', 'value', 'sum', 'charge', 'payment'
+          ]);
+
+          const amount = parseAmount(amountStr);
+
+          const category = extractField(row, [
+            'category', 'type', 'class', 'group', 'tag'
+          ]) || 'Uncategorized';
+
+          const dateStr = extractField(row, [
+            'date', 'transaction_date', 'purchase_date', 'posted_date', 'time', 'timestamp'
+          ]);
+
+          const date = formatDate(dateStr);
 
           return {
-            vendor: String(vendor),
-            amount: isNaN(amount) ? 0 : Math.abs(amount),
-            category: String(category),
-            date: formatDate(date),
+            vendor: String(vendor).trim(),
+            amount: amount,
+            category: String(category).trim(),
+            date: date,
           };
-        }).filter(t => t.vendor && t.amount > 0);
+        }).filter(t => t.vendor && t.vendor !== 'undefined' && t.amount > 0);
 
+        console.log('Parsed transactions:', transactions);
         resolve(transactions);
-      } catch (error) {
-        reject(new Error('Failed to parse Excel file. Please ensure it has columns: vendor, amount, category, date'));
+      } catch (error: any) {
+        console.error('Excel parsing error:', error);
+        reject(new Error(`Failed to parse Excel file: ${error.message}`));
       }
     };
 
@@ -48,25 +99,50 @@ export const parseCSVFile = async (file: File): Promise<ParsedTransaction[]> => 
   return new Promise((resolve, reject) => {
     Papa.parse(file, {
       header: true,
+      skipEmptyLines: true,
       complete: (results) => {
         try {
+          console.log('CSV data parsed:', results.data);
+
+          if (!results.data || results.data.length === 0) {
+            reject(new Error('No data found in CSV file'));
+            return;
+          }
+
           const transactions = results.data.map((row: any) => {
-            const vendor = row.vendor || row.Vendor || row.VENDOR || row.description || row.Description || '';
-            const amount = parseFloat(row.amount || row.Amount || row.AMOUNT || row.total || row.Total || '0');
-            const category = row.category || row.Category || row.CATEGORY || 'Uncategorized';
-            const date = row.date || row.Date || row.DATE || new Date().toISOString().split('T')[0];
+            const vendor = extractField(row, [
+              'vendor', 'merchant', 'description', 'name', 'payee', 'store', 'shop'
+            ]);
+
+            const amountStr = extractField(row, [
+              'amount', 'total', 'price', 'cost', 'value', 'sum', 'charge', 'payment'
+            ]);
+
+            const amount = parseAmount(amountStr);
+
+            const category = extractField(row, [
+              'category', 'type', 'class', 'group', 'tag'
+            ]) || 'Uncategorized';
+
+            const dateStr = extractField(row, [
+              'date', 'transaction_date', 'purchase_date', 'posted_date', 'time', 'timestamp'
+            ]);
+
+            const date = formatDate(dateStr);
 
             return {
-              vendor: String(vendor),
-              amount: isNaN(amount) ? 0 : Math.abs(amount),
-              category: String(category),
-              date: formatDate(date),
+              vendor: String(vendor).trim(),
+              amount: amount,
+              category: String(category).trim(),
+              date: date,
             };
-          }).filter(t => t.vendor && t.amount > 0);
+          }).filter(t => t.vendor && t.vendor !== 'undefined' && t.amount > 0);
 
+          console.log('Parsed transactions:', transactions);
           resolve(transactions);
-        } catch (error) {
-          reject(new Error('Failed to parse CSV file. Please ensure it has columns: vendor, amount, category, date'));
+        } catch (error: any) {
+          console.error('CSV parsing error:', error);
+          reject(new Error(`Failed to parse CSV file: ${error.message}`));
         }
       },
       error: (error) => reject(new Error(`CSV parsing error: ${error.message}`)),

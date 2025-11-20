@@ -219,13 +219,21 @@ const Dashboard = () => {
     setUploading(true);
     try {
       const parsed = await parseFile(file);
-      setParsedTransactions(parsed);
-      toast.success(`Found ${parsed.length} transactions in file`);
+
+      if (parsed.length === 0) {
+        toast.error("No transactions found. Check that your file has columns: vendor/merchant/description, amount/total, category, and date");
+        setParsedTransactions([]);
+      } else {
+        setParsedTransactions(parsed);
+        toast.success(`Found ${parsed.length} transactions in file`);
+      }
     } catch (error: any) {
+      console.error('File upload error:', error);
       toast.error(error.message || "Failed to parse file");
       setParsedTransactions([]);
     } finally {
       setUploading(false);
+      event.target.value = '';
     }
   };
 
@@ -445,9 +453,16 @@ const Dashboard = () => {
                           <div className="border-2 border-dashed rounded-lg p-8 text-center">
                             <FileSpreadsheet className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
                             <h3 className="text-lg font-semibold mb-2">Upload Transaction File</h3>
-                            <p className="text-sm text-muted-foreground mb-4">
+                            <p className="text-sm text-muted-foreground mb-2">
                               Supports Excel (.xlsx, .xls), CSV, PDF, and images (JPG, PNG)
                             </p>
+                            <div className="text-xs text-muted-foreground mb-4 space-y-1">
+                              <p>Your file should include columns like:</p>
+                              <p><strong>Vendor</strong> (or merchant, description, name)</p>
+                              <p><strong>Amount</strong> (or total, price, cost)</p>
+                              <p><strong>Category</strong> (or type, optional)</p>
+                              <p><strong>Date</strong> (or transaction_date, optional)</p>
+                            </div>
                             <Label htmlFor="file-upload" className="cursor-pointer">
                               <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90">
                                 <Upload className="h-4 w-4" />
