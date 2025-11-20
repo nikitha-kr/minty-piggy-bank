@@ -19,11 +19,32 @@ export const Header = () => {
             Dashboard
           </NavLink>
           <NavLink 
+            to="/goals" 
+            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            activeClassName="text-primary font-semibold"
+          >
+            Goals
+          </NavLink>
+          <NavLink 
+            to="/rules" 
+            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            activeClassName="text-primary font-semibold"
+          >
+            Rules
+          </NavLink>
+          <NavLink 
             to="/reports" 
             className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
             activeClassName="text-primary font-semibold"
           >
             Reports
+          </NavLink>
+          <NavLink 
+            to="/profile" 
+            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            activeClassName="text-primary font-semibold"
+          >
+            Profile
           </NavLink>
         </nav>
       </div>

@@ -1,4 +1,6 @@
 import { Card } from "@/components/ui/card";
+import { Pencil, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface Transaction {
   id: string;
@@ -10,12 +12,14 @@ interface Transaction {
 
 interface TransactionListProps {
   transactions: Transaction[];
+  onEdit: (transaction: Transaction) => void;
+  onDelete: (id: string) => void;
 }
 
-export const TransactionList = ({ transactions }: TransactionListProps) => {
+export const TransactionList = ({ transactions, onEdit, onDelete }: TransactionListProps) => {
+
   return (
     <Card className="p-4">
-      <h2 className="text-lg font-semibold mb-4">Recent Transactions</h2>
       <div className="space-y-3">
         {transactions.map((transaction) => (
           <div
@@ -28,7 +32,29 @@ export const TransactionList = ({ transactions }: TransactionListProps) => {
                 {transaction.category} • {transaction.timestamp}
               </p>
             </div>
-            <p className="font-semibold text-sm">{transaction.amount}</p>
+            <div className="flex items-center gap-3">
+              <p className="font-semibold text-sm">{transaction.amount}</p>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => onEdit(transaction)}
+                  title="Edit transaction"
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-destructive hover:text-destructive"
+                  onClick={() => onDelete(transaction.id)}
+                  title="Delete transaction"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
           </div>
         ))}
       </div>
