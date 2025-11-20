@@ -9,17 +9,23 @@ export interface ParsedTransaction {
 }
 
 const extractField = (row: any, fieldNames: string[]): string => {
+  console.log('Extracting field from row:', row, 'looking for:', fieldNames);
+
   for (const name of fieldNames) {
     const lowerName = name.toLowerCase();
     for (const key in row) {
-      if (key.toLowerCase().includes(lowerName)) {
+      const lowerKey = key.toLowerCase();
+      if (lowerKey === lowerName || lowerKey.includes(lowerName) || lowerName.includes(lowerKey)) {
         const value = row[key];
         if (value !== null && value !== undefined && value !== '') {
+          console.log(`Found field "${key}" for "${name}":`, value);
           return String(value);
         }
       }
     }
   }
+
+  console.log('No field found for:', fieldNames);
   return '';
 };
 
@@ -47,6 +53,7 @@ export const parseExcelFile = async (file: File): Promise<ParsedTransaction[]> =
         const jsonData = XLSX.utils.sheet_to_json(firstSheet);
 
         console.log('Excel data parsed:', jsonData);
+        console.log('Available columns:', jsonData.length > 0 ? Object.keys(jsonData[0]) : []);
 
         if (!jsonData || jsonData.length === 0) {
           reject(new Error('No data found in Excel file'));
@@ -103,6 +110,7 @@ export const parseCSVFile = async (file: File): Promise<ParsedTransaction[]> => 
       complete: (results) => {
         try {
           console.log('CSV data parsed:', results.data);
+          console.log('Available columns:', results.data.length > 0 ? Object.keys(results.data[0]) : []);
 
           if (!results.data || results.data.length === 0) {
             reject(new Error('No data found in CSV file'));

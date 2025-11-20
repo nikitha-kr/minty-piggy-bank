@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate } from "react-router-dom";
 import { Coins, Coffee, ShoppingBag, Upload, FileSpreadsheet } from "lucide-react";
 import { parseFile, ParsedTransaction } from "@/lib/fileParser";
+import { SampleFileDownload } from "@/components/SampleFileDownload";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -477,6 +478,7 @@ const Dashboard = () => {
                                 disabled={uploading}
                               />
                             </Label>
+                            <SampleFileDownload />
                           </div>
 
                           {parsedTransactions.length > 0 && (
