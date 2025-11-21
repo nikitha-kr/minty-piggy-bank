@@ -53,20 +53,28 @@ export interface RulesState {
 }
 
 async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
-  });
+  try {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      ...options,
+      mode: 'cors',
+      headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers,
+      },
+    });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`API Error: ${response.status} - ${errorText}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`API Error: ${response.status} - ${errorText}`);
+    }
+
+    return response.json();
+  } catch (error: any) {
+    if (error.message === 'Failed to fetch') {
+      throw new Error('CORS Error: Unable to connect to backend. Please ensure CORS is enabled on the GCP API Gateway.');
+    }
+    throw error;
   }
-
-  return response.json();
 }
 
 export const gcpApi = {
