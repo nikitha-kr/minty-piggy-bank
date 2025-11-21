@@ -77,24 +77,6 @@ const Rules = () => {
               </div>
             </div>
           </Card>
-
-          <Card className="p-6 bg-muted/50">
-            <h2 className="text-2xl font-bold mb-2">Coming Soon</h2>
-            <p className="text-sm text-muted-foreground mb-4">
-              Additional rules and customization options will be available in future updates.
-            </p>
-            <div className="space-y-3 opacity-50">
-              <div className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="flex-1">
-                  <Label className="text-base font-semibold">Daily Auto-Save</Label>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Automatically save a fixed amount every day
-                  </p>
-                </div>
-                <Switch disabled checked={false} />
-              </div>
-            </div>
-          </Card>
         </div>
       </main>
     </div>
