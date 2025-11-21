@@ -93,15 +93,6 @@ const Rules = () => {
                 </div>
                 <Switch disabled checked={false} />
               </div>
-              <div className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="flex-1">
-                  <Label className="text-base font-semibold">Vendor-Based Rules</Label>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Save a custom amount when you shop at specific merchants
-                  </p>
-                </div>
-                <Switch disabled checked={false} />
-              </div>
             </div>
           </Card>
         </div>
