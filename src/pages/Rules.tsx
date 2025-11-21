@@ -2,166 +2,42 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Info } from "lucide-react";
 import { toast } from "sonner";
-import { useAuth } from "@/contexts/AuthContext";
-import { supabase, Rule as DbRule } from "@/lib/supabase";
-
-interface CustomRule {
-  id: string;
-  vendor: string;
-  amount: string;
-}
+import { gcpApi } from "@/lib/gcpApiClient";
 
 const Rules = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [autoRoundup, setAutoRoundup] = useState(false);
-  const [autoRoundupRuleId, setAutoRoundupRuleId] = useState<string | null>(null);
-  const [dailySave, setDailySave] = useState(false);
-  const [dailySaveRuleId, setDailySaveRuleId] = useState<string | null>(null);
-  const [customRules, setCustomRules] = useState<CustomRule[]>([]);
-  const [vendor, setVendor] = useState("");
-  const [amount, setAmount] = useState("");
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   useEffect(() => {
-    if (!user) {
-      navigate("/");
-      return;
-    }
     fetchRules();
-  }, [user, navigate]);
+  }, []);
 
   const fetchRules = async () => {
-    if (!user) return;
-
     try {
-      const { data, error } = await supabase
-        .from('rules')
-        .select('*')
-        .eq('user_id', user.id);
-
-      if (error) throw error;
-
-      if (data) {
-        const roundupRule = data.find(r => r.type === 'automated' && r.name === 'Auto Round-Up');
-        const dailyRule = data.find(r => r.type === 'automated' && r.name === 'Daily Save $1');
-
-        if (roundupRule) {
-          setAutoRoundup(roundupRule.enabled);
-          setAutoRoundupRuleId(roundupRule.id);
-        }
-
-        if (dailyRule) {
-          setDailySave(dailyRule.enabled);
-          setDailySaveRuleId(dailyRule.id);
-        }
-
-        const custom = data.filter(r => r.type === 'custom').map(r => ({
-          id: r.id,
-          vendor: r.condition_value || '',
-          amount: r.action_amount?.toString() || '0',
-        }));
-
-        setCustomRules(custom);
-      }
-    } catch (error) {
+      const data = await gcpApi.rules.getAll();
+      setAutoRoundup(data.rules.roundup.is_active);
+    } catch (error: any) {
       console.error('Error fetching rules:', error);
+      toast.error(error.message || "Failed to fetch rules");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleToggleAutomatedRule = async (ruleType: 'roundup' | 'daily', enabled: boolean) => {
-    if (!user) return;
-
+  const handleToggleRoundup = async (enabled: boolean) => {
     try {
-      const ruleName = ruleType === 'roundup' ? 'Auto Round-Up' : 'Daily Save $1';
-      const ruleId = ruleType === 'roundup' ? autoRoundupRuleId : dailySaveRuleId;
-
-      if (ruleId) {
-        const { error } = await supabase
-          .from('rules')
-          .update({ enabled })
-          .eq('id', ruleId);
-
-        if (error) throw error;
-      } else {
-        const { data, error } = await supabase
-          .from('rules')
-          .insert({
-            user_id: user.id,
-            name: ruleName,
-            type: 'automated',
-            enabled,
-            condition_type: null,
-            condition_value: null,
-            action_amount: ruleType === 'daily' ? 1 : null,
-          })
-          .select()
-          .single();
-
-        if (error) throw error;
-
-        if (data) {
-          if (ruleType === 'roundup') {
-            setAutoRoundupRuleId(data.id);
-          } else {
-            setDailySaveRuleId(data.id);
-          }
-        }
-      }
-
-      if (ruleType === 'roundup') {
-        setAutoRoundup(enabled);
-      } else {
-        setDailySave(enabled);
-      }
-
-      toast.success(`Rule ${enabled ? 'enabled' : 'disabled'}`);
+      await gcpApi.rules.toggleRoundup(enabled);
+      setAutoRoundup(enabled);
+      toast.success(`Round-up rule ${enabled ? 'enabled' : 'disabled'}`);
     } catch (error: any) {
       toast.error(error.message || "Failed to update rule");
-    }
-  };
-
-  const handleCreateRule = async () => {
-    if (!vendor || !amount || !user) {
-      toast.error("Please fill in all fields");
-      return;
-    }
-
-    try {
-      const { error } = await supabase.from('rules').insert({
-        user_id: user.id,
-        name: `Save $${amount} for ${vendor}`,
-        type: 'custom',
-        enabled: true,
-        condition_type: 'vendor',
-        condition_value: vendor,
-        action_amount: parseFloat(amount),
-      });
-
-      if (error) throw error;
-
-      setVendor("");
-      setAmount("");
-      setIsDialogOpen(false);
-      toast.success("Rule created!");
-      fetchRules();
-    } catch (error: any) {
-      toast.error(error.message || "Failed to create rule");
+      setAutoRoundup(!enabled);
     }
   };
 
@@ -174,83 +50,58 @@ const Rules = () => {
       <Header />
       <main className="container mx-auto px-4 py-8">
         <div className="max-w-2xl mx-auto space-y-8">
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              Rules help you automatically save money with every transaction. Configure your preferences below.
+            </AlertDescription>
+          </Alert>
+
           <Card className="p-6">
             <h2 className="text-2xl font-bold mb-4">Automated Rules</h2>
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="auto-roundup" className="text-base">
-                  Automatically round-up ALL transactions
-                </Label>
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="flex-1">
+                  <Label htmlFor="auto-roundup" className="text-base font-semibold">
+                    Round-up Savings
+                  </Label>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Automatically round up all transactions to the nearest dollar and save the difference
+                  </p>
+                </div>
                 <Switch
                   id="auto-roundup"
                   checked={autoRoundup}
-                  onCheckedChange={(checked) => handleToggleAutomatedRule('roundup', checked)}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label htmlFor="daily-save" className="text-base">
-                  Automatically save $1 every day
-                </Label>
-                <Switch
-                  id="daily-save"
-                  checked={dailySave}
-                  onCheckedChange={(checked) => handleToggleAutomatedRule('daily', checked)}
+                  onCheckedChange={handleToggleRoundup}
                 />
               </div>
             </div>
           </Card>
 
-          <Card className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-bold">My Custom Rules</h2>
-              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button>+ Create New Rule</Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Create a Custom Rule</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4 pt-4">
-                    <div>
-                      <Label htmlFor="vendor">If my transaction vendor is...</Label>
-                      <Input
-                        id="vendor"
-                        placeholder="e.g., Starbucks"
-                        value={vendor}
-                        onChange={(e) => setVendor(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="save-amount">Then save...</Label>
-                      <Input
-                        id="save-amount"
-                        type="number"
-                        step="0.01"
-                        placeholder="e.g., 1.00"
-                        value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
-                      />
-                    </div>
-                    <Button onClick={handleCreateRule} className="w-full">
-                      Save Rule
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </div>
-            <div className="space-y-3">
-              {customRules.map((rule) => (
-                <div
-                  key={rule.id}
-                  className="flex items-center justify-between p-3 border rounded-md"
-                >
-                  <p className="text-sm">
-                    If vendor is <span className="font-semibold">{rule.vendor}</span>, save{" "}
-                    <span className="font-semibold">${rule.amount}</span>
+          <Card className="p-6 bg-muted/50">
+            <h2 className="text-2xl font-bold mb-2">Coming Soon</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Additional rules and customization options will be available in future updates.
+            </p>
+            <div className="space-y-3 opacity-50">
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="flex-1">
+                  <Label className="text-base font-semibold">Daily Auto-Save</Label>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Automatically save a fixed amount every day
                   </p>
                 </div>
-              ))}
+                <Switch disabled checked={false} />
+              </div>
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="flex-1">
+                  <Label className="text-base font-semibold">Vendor-Based Rules</Label>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Save a custom amount when you shop at specific merchants
+                  </p>
+                </div>
+                <Switch disabled checked={false} />
+              </div>
             </div>
           </Card>
         </div>

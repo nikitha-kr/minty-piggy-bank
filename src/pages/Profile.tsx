@@ -1,63 +1,32 @@
-import { Header } from "@/components/Header";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { Header } from "@/components/Header";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Info, Mail, DollarSign } from "lucide-react";
 import { toast } from "sonner";
-import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/lib/supabase";
+import { gcpApi, User } from "@/lib/gcpApiClient";
 
 const Profile = () => {
   const navigate = useNavigate();
-  const { user, profile, signOut, refreshProfile } = useAuth();
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [monthlyIncome, setMonthlyIncome] = useState("");
 
   useEffect(() => {
-    if (!user) {
-      navigate("/");
-      return;
-    }
-    if (profile) {
-      setMonthlyIncome(profile.monthly_income?.toString() || "0");
+    fetchUserData();
+  }, []);
+
+  const fetchUserData = async () => {
+    try {
+      const userData = await gcpApi.user.getMe();
+      setUser(userData);
+    } catch (error: any) {
+      console.error('Error fetching user data:', error);
+      toast.error(error.message || "Failed to fetch user data");
+    } finally {
       setLoading(false);
-    }
-  }, [user, profile, navigate]);
-
-  const handleUpdateIncome = async () => {
-    if (!user || !monthlyIncome) {
-      toast.error("Please enter a valid amount");
-      return;
-    }
-
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          monthly_income: parseFloat(monthlyIncome),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', user.id);
-
-      if (error) throw error;
-
-      toast.success("Monthly income updated successfully!");
-      await refreshProfile();
-    } catch (error: any) {
-      toast.error(error.message || "Failed to update income");
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      await signOut();
-      toast.success("Logged out successfully");
-      navigate("/");
-    } catch (error: any) {
-      toast.error(error.message || "Failed to logout");
     }
   };
 
@@ -66,72 +35,85 @@ const Profile = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-muted/30">
       <Header />
-      
       <main className="container mx-auto px-4 py-8">
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-2xl mx-auto space-y-6">
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              This is a demo account. Profile editing features will be available in future updates.
+            </AlertDescription>
+          </Alert>
+
           <Card>
             <CardHeader>
-              <CardTitle>Profile Settings</CardTitle>
-              <CardDescription>Manage your account information</CardDescription>
+              <CardTitle>Profile Information</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="flex items-center gap-4">
                 <Avatar className="w-20 h-20">
-                  <AvatarImage src="" />
                   <AvatarFallback className="bg-primary text-primary-foreground text-2xl">
-                    {profile?.name.split(" ").map(n => n[0]).join("") || "U"}
+                    {user?.email.charAt(0).toUpperCase() || "D"}
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <h3 className="font-semibold">{profile?.name}</h3>
-                  <p className="text-sm text-muted-foreground">{profile?.email}</p>
+                  <h3 className="text-xl font-semibold">Demo User</h3>
+                  <p className="text-sm text-muted-foreground">PigMint Finance Member</p>
                 </div>
               </div>
 
               <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Name</Label>
-                  <Input
-                    id="name"
-                    value={profile?.name || ""}
-                    disabled
-                    className="bg-muted"
-                  />
+                <div className="flex items-start gap-3 p-4 border rounded-lg">
+                  <Mail className="w-5 h-5 mt-0.5 text-muted-foreground" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-muted-foreground">Email</p>
+                    <p className="text-base">{user?.email || "N/A"}</p>
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email ID</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={profile?.email || ""}
-                    disabled
-                    className="bg-muted"
-                  />
+                <div className="flex items-start gap-3 p-4 border rounded-lg">
+                  <DollarSign className="w-5 h-5 mt-0.5 text-muted-foreground" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-muted-foreground">User ID</p>
+                    <p className="text-base font-mono">{user?.user_id || "N/A"}</p>
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="income">Monthly Income</Label>
-                  <Input
-                    id="income"
-                    type="number"
-                    step="0.01"
-                    placeholder="Enter your monthly income"
-                    value={monthlyIncome}
-                    onChange={(e) => setMonthlyIncome(e.target.value)}
-                  />
+                <div className="flex items-start gap-3 p-4 border rounded-lg bg-green-50 dark:bg-green-950">
+                  <DollarSign className="w-5 h-5 mt-0.5 text-green-600" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-green-600">Total Saved</p>
+                    <p className="text-2xl font-bold text-green-600">
+                      ${user?.total_saved.toFixed(2) || "0.00"}
+                    </p>
+                  </div>
                 </div>
+              </div>
 
-                <Button onClick={handleUpdateIncome} className="w-full">
-                  Update Income
-                </Button>
-
-                <Button onClick={handleLogout} variant="destructive" className="w-full">
-                  Logout
+              <div className="pt-4 border-t">
+                <Button onClick={() => navigate("/dashboard")} className="w-full">
+                  Back to Dashboard
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-muted/50">
+            <CardHeader>
+              <CardTitle>Account Settings</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-4">
+                Additional account management features coming soon:
+              </p>
+              <ul className="list-disc list-inside space-y-2 text-sm text-muted-foreground">
+                <li>Edit profile information</li>
+                <li>Change password</li>
+                <li>Notification preferences</li>
+                <li>Monthly income tracking</li>
+                <li>Export transaction history</li>
+              </ul>
             </CardContent>
           </Card>
         </div>

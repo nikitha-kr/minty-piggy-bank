@@ -7,74 +7,42 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { useAuth } from "@/contexts/AuthContext";
-import { supabase, Goal as DbGoal } from "@/lib/supabase";
-
-interface Goal {
-  id: string;
-  name: string;
-  current: number;
-  target: number;
-}
+import { gcpApi, Goal } from "@/lib/gcpApiClient";
 
 const Goals = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
   const [goalName, setGoalName] = useState("");
   const [totalAmount, setTotalAmount] = useState("");
 
   useEffect(() => {
-    if (!user) {
-      navigate("/");
-      return;
-    }
     fetchGoals();
-  }, [user, navigate]);
+  }, []);
 
   const fetchGoals = async () => {
-    if (!user) return;
-
     try {
-      const { data, error } = await supabase
-        .from('goals')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      if (data) {
-        setGoals(data.map(g => ({
-          id: g.id,
-          name: g.name,
-          current: g.current_amount,
-          target: g.target_amount,
-        })));
-      }
-    } catch (error) {
+      const data = await gcpApi.goals.getAll();
+      setGoals(data.goals);
+    } catch (error: any) {
       console.error('Error fetching goals:', error);
+      toast.error(error.message || "Failed to fetch goals");
     } finally {
       setLoading(false);
     }
   };
 
   const handleCreateGoal = async () => {
-    if (!goalName || !totalAmount || !user) {
+    if (!goalName || !totalAmount) {
       toast.error("Please fill in all fields");
       return;
     }
 
     try {
-      const { error } = await supabase.from('goals').insert({
-        user_id: user.id,
+      await gcpApi.goals.create({
         name: goalName,
         target_amount: parseFloat(totalAmount),
-        current_amount: 0,
       });
-
-      if (error) throw error;
 
       setGoalName("");
       setTotalAmount("");
@@ -125,14 +93,20 @@ const Goals = () => {
           <div>
             <h2 className="text-2xl font-bold mb-4">My Active Goals</h2>
             <div className="space-y-4">
-              {goals.map((goal) => (
-                <GoalCard
-                  key={goal.id}
-                  title={goal.name}
-                  current={goal.current}
-                  target={goal.target}
-                />
-              ))}
+              {goals.length > 0 ? (
+                goals.map((goal) => (
+                  <GoalCard
+                    key={goal.goal_id}
+                    title={goal.name}
+                    current={goal.current_amount}
+                    target={goal.target_amount}
+                  />
+                ))
+              ) : (
+                <Card className="p-6 text-center text-muted-foreground">
+                  <p>No goals yet. Create one above to get started!</p>
+                </Card>
+              )}
             </div>
           </div>
         </div>

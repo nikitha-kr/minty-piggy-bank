@@ -1,85 +1,49 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/Header";
+import { SpendingChart } from "@/components/SpendingChart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/lib/supabase";
-import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Info, TrendingUp, DollarSign } from "lucide-react";
+import { toast } from "sonner";
+import { gcpApi, CategorySpend, User } from "@/lib/gcpApiClient";
 
 const Reports = () => {
-  const navigate = useNavigate();
-  const { user, profile } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [percentageSaved, setPercentageSaved] = useState(0);
-  const [totalExpenses, setTotalExpenses] = useState(0);
-  const [monthlySavings, setMonthlySavings] = useState<any[]>([]);
-  const [expensesByCategory, setExpensesByCategory] = useState<any[]>([]);
+  const [user, setUser] = useState<User | null>(null);
+  const [categorySpending, setCategorySpending] = useState<CategorySpend[]>([]);
+  const [spendingPeriod, setSpendingPeriod] = useState<'this_month' | 'this_week' | 'all'>('this_month');
 
   useEffect(() => {
-    if (!user) {
-      navigate("/");
-      return;
-    }
-    fetchAnalytics();
-  }, [user, navigate]);
+    fetchData();
+  }, []);
 
-  const fetchAnalytics = async () => {
-    if (!user || !profile) return;
+  useEffect(() => {
+    fetchCategorySpending();
+  }, [spendingPeriod]);
 
+  const fetchData = async () => {
     try {
-      const { data: transactions, error: transError } = await supabase
-        .from('transactions')
-        .select('*')
-        .eq('user_id', user.id);
-
-      if (transError) throw transError;
-
-      const { data: savingsActions, error: savingsError } = await supabase
-        .from('savings_actions')
-        .select('*')
-        .eq('user_id', user.id);
-
-      if (savingsError) throw savingsError;
-
-      const totalExpense = transactions?.reduce((sum, t) => sum + t.amount, 0) || 0;
-      setTotalExpenses(totalExpense);
-
-      const totalSavings = savingsActions?.reduce((sum, s) => sum + s.amount, 0) || 0;
-      const monthlyIncome = profile.monthly_income || 0;
-      const percentage = monthlyIncome > 0 ? (totalSavings / monthlyIncome) * 100 : 0;
-      setPercentageSaved(percentage);
-
-      const savingsByMonth: { [key: string]: number } = {};
-      savingsActions?.forEach(action => {
-        const month = new Date(action.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-        savingsByMonth[month] = (savingsByMonth[month] || 0) + action.amount;
-      });
-
-      const monthlySavingsData = Object.entries(savingsByMonth).map(([month, amount]) => ({
-        month,
-        amount,
-      }));
-      setMonthlySavings(monthlySavingsData.slice(-6));
-
-      const categoryMap: { [key: string]: number } = {};
-      transactions?.forEach(t => {
-        categoryMap[t.category] = (categoryMap[t.category] || 0) + t.amount;
-      });
-
-      const categoryData = Object.entries(categoryMap).map(([name, value]) => ({
-        name,
-        value,
-      }));
-      setExpensesByCategory(categoryData);
-
-    } catch (error) {
-      console.error('Error fetching analytics:', error);
+      const userData = await gcpApi.user.getMe();
+      setUser(userData);
+    } catch (error: any) {
+      console.error('Error fetching user data:', error);
+      toast.error(error.message || "Failed to fetch user data");
     } finally {
       setLoading(false);
     }
   };
 
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
+  const fetchCategorySpending = async () => {
+    try {
+      const data = await gcpApi.spending.getByCategory(spendingPeriod);
+      setCategorySpending(data.categories);
+    } catch (error: any) {
+      console.error('Error fetching category spending:', error);
+      toast.error(error.message || "Failed to fetch spending data");
+    }
+  };
+
+  const totalSpending = categorySpending.reduce((sum, cat) => sum + cat.total, 0);
 
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
@@ -92,92 +56,90 @@ const Reports = () => {
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Financial Analytics</h1>
           <p className="text-muted-foreground">
-            Visualizing your financial health
+            Track your spending patterns and savings progress
           </p>
         </div>
 
+        <Alert className="mb-6">
+          <Info className="h-4 w-4" />
+          <AlertDescription>
+            Additional analytics features like monthly trends and comparative insights will be available in future updates.
+          </AlertDescription>
+        </Alert>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          <Card>
+          <Card className="bg-gradient-to-r from-green-500 to-green-600 text-white">
             <CardHeader>
-              <CardTitle className="text-lg">% of Income Saved</CardTitle>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <DollarSign className="w-5 h-5" />
+                Total Saved
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-5xl font-bold text-primary">
-                {percentageSaved.toFixed(1)}%
+              <div className="text-5xl font-bold">
+                ${user?.total_saved.toFixed(2) || "0.00"}
               </div>
+              <p className="text-sm opacity-90 mt-2">Lifetime savings</p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="bg-gradient-to-r from-blue-500 to-blue-600 text-white">
             <CardHeader>
-              <CardTitle className="text-lg">Total Expenses</CardTitle>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <TrendingUp className="w-5 h-5" />
+                Total Spending
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-5xl font-bold text-primary">
-                ${totalExpenses.toFixed(2)}
+              <div className="text-5xl font-bold">
+                ${totalSpending.toFixed(2)}
               </div>
+              <p className="text-sm opacity-90 mt-2">
+                For selected period: {spendingPeriod.replace('_', ' ')}
+              </p>
             </CardContent>
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Monthly Savings Trend</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {monthlySavings.length > 0 ? (
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={monthlySavings}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Line type="monotone" dataKey="amount" stroke="#8884d8" name="Savings ($)" />
-                  </LineChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                  No savings data yet
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Expense by Category</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {expensesByCategory.length > 0 ? (
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={expensesByCategory}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={(entry) => `${entry.name}: $${entry.value.toFixed(0)}`}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {expensesByCategory.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                  No expense data yet
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        <div className="mb-8">
+          <SpendingChart
+            data={categorySpending}
+            period={spendingPeriod}
+            onPeriodChange={(period) => setSpendingPeriod(period as 'this_month' | 'this_week' | 'all')}
+          />
         </div>
+
+        {categorySpending.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Category Breakdown</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {categorySpending.map((category, index) => {
+                  const percentage = totalSpending > 0 ? (category.total / totalSpending) * 100 : 0;
+                  return (
+                    <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex-1">
+                        <p className="font-semibold">{category.category}</p>
+                        <div className="w-full bg-muted rounded-full h-2 mt-2">
+                          <div
+                            className="bg-primary h-2 rounded-full transition-all"
+                            style={{ width: `${percentage}%` }}
+                          />
+                        </div>
+                      </div>
+                      <div className="text-right ml-4">
+                        <p className="font-semibold">${category.total.toFixed(2)}</p>
+                        <p className="text-xs text-muted-foreground">{percentage.toFixed(1)}%</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </main>
     </div>
   );

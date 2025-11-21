@@ -12,6 +12,7 @@ interface RecommendationCardProps {
   goals: { id: string; name: string }[];
   onSave: (goalId: string) => void;
   onDismiss: () => void;
+  hideActions?: boolean;
 }
 
 export const RecommendationCard = ({
@@ -22,6 +23,7 @@ export const RecommendationCard = ({
   goals,
   onSave,
   onDismiss,
+  hideActions = false,
 }: RecommendationCardProps) => {
   const [selectedGoal, setSelectedGoal] = useState<string>(goals[0]?.id || "");
 
@@ -36,29 +38,40 @@ export const RecommendationCard = ({
           <p className="text-sm text-muted-foreground">{description}</p>
         </div>
       </div>
-      <div className="mb-3">
-        <label className="text-xs text-muted-foreground mb-1 block">Save to Goal:</label>
-        <Select value={selectedGoal} onValueChange={setSelectedGoal}>
-          <SelectTrigger className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {goals.map((goal) => (
-              <SelectItem key={goal.id} value={goal.id}>
-                {goal.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="flex gap-2">
-        <Button onClick={() => onSave(selectedGoal)} className="flex-1">
-          Save {saveAmount}
-        </Button>
-        <Button onClick={onDismiss} variant="secondary" className="flex-1">
-          Dismiss
-        </Button>
-      </div>
+      {!hideActions && (
+        <>
+          <div className="mb-3">
+            <label className="text-xs text-muted-foreground mb-1 block">Save to Goal:</label>
+            <Select value={selectedGoal} onValueChange={setSelectedGoal}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {goals.map((goal) => (
+                  <SelectItem key={goal.id} value={goal.id}>
+                    {goal.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={() => onSave(selectedGoal)} className="flex-1">
+              Save {saveAmount}
+            </Button>
+            <Button onClick={onDismiss} variant="secondary" className="flex-1">
+              Dismiss
+            </Button>
+          </div>
+        </>
+      )}
+      {hideActions && (
+        <div className="flex justify-end">
+          <Button onClick={onDismiss} variant="ghost" size="sm">
+            Dismiss
+          </Button>
+        </div>
+      )}
     </Card>
   );
 };
