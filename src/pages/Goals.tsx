@@ -7,42 +7,23 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/contexts/AuthContext";
-
-interface Goal {
-  id: string;
-  name: string;
-  target_amount: number;
-  current_amount: number;
-}
+import { gcpApi, Goal } from "@/lib/gcpApiClient";
 
 const Goals = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
   const [goalName, setGoalName] = useState("");
   const [totalAmount, setTotalAmount] = useState("");
 
   useEffect(() => {
-    if (user) {
-      fetchGoals();
-    } else {
-      setLoading(false);
-    }
-  }, [user]);
+    fetchGoals();
+  }, []);
 
   const fetchGoals = async () => {
     try {
-      const { data, error } = await supabase
-        .from('goals')
-        .select('id, name, target_amount, current_amount')
-        .eq('user_id', user?.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setGoals(data || []);
+      const data = await gcpApi.goals.getAll();
+      setGoals(data.goals);
     } catch (error: any) {
       console.error('Error fetching goals:', error);
       toast.error(error.message || "Failed to fetch goals");
@@ -57,22 +38,11 @@ const Goals = () => {
       return;
     }
 
-    if (!user) {
-      toast.error("Please log in to create goals");
-      return;
-    }
-
     try {
-      const { error } = await supabase
-        .from('goals')
-        .insert({
-          user_id: user.id,
-          name: goalName,
-          target_amount: parseFloat(totalAmount),
-          current_amount: 0
-        });
-
-      if (error) throw error;
+      await gcpApi.goals.create({
+        name: goalName,
+        target_amount: parseFloat(totalAmount),
+      });
 
       setGoalName("");
       setTotalAmount("");
@@ -126,7 +96,7 @@ const Goals = () => {
               {goals.length > 0 ? (
                 goals.map((goal) => (
                   <GoalCard
-                    key={goal.id}
+                    key={goal.goal_id}
                     title={goal.name}
                     current={goal.current_amount}
                     target={goal.target_amount}
