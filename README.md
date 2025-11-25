@@ -1,4 +1,6 @@
-# Welcome to your Lovable project
+# PigMint - Smart Savings Application
+
+A personal finance application that helps users save money through automated rules and goal tracking.
 
 ## Project info
 
@@ -50,6 +52,33 @@ npm run dev
 - Click on "New codespace" to launch a new Codespace environment.
 - Edit files directly within the Codespace and commit and push your changes once you're done.
 
+## Features
+
+- **Dashboard**: View spending summaries, savings progress, and personalized recommendations
+- **Transactions**: Track all your financial transactions with categorization and search
+- **Goals**: Create and monitor savings goals with progress tracking
+- **Rules**: Automated savings rules including round-up functionality
+- **Reports**: Generate detailed spending reports filtered by date range
+- **Profile**: Manage user profile and account settings
+
+## Architecture
+
+The application uses a hybrid architecture:
+
+- **Frontend**: React with TypeScript, using Vite for fast development
+- **Backend**: GCP-based API for transaction processing and data management
+- **Database**: Supabase for authentication and data persistence
+
+### Backend Integration
+
+The app connects to a GCP backend API that handles:
+- Transaction management and processing
+- Savings rules engine
+- Goal tracking and updates
+- Spending analytics and reports
+
+The backend API endpoint is configured via `VITE_BACKEND_API_URL` environment variable.
+
 ## What technologies are used for this project?
 
 This project is built with:
@@ -59,6 +88,9 @@ This project is built with:
 - React
 - shadcn-ui
 - Tailwind CSS
+- Supabase (authentication and database)
+- React Query (data fetching)
+- Recharts (data visualization)
 
 ## How can I deploy this project?
 
